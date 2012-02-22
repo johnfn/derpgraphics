@@ -1,0 +1,15 @@
+*.o
+*.exe
+*.ipch
+*.ilk
+*.pch
+*.opensdf
+*.sdf
+*.suo
+*~
+*.ncb
+main
+vs2010
+vs2008
+xcode
+.DS_Store
