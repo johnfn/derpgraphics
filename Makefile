@@ -1,4 +1,4 @@
-CXXFLAGS = -g -Wall -Ilinux/include -I/usr/class/cs248/include
+CXXFLAGS = -g -Wall -Ixcode/include
 LIBS = -Llinux/lib64 -Llinux/lib \
 	-lsfml-network \
 	-lsfml-window \
