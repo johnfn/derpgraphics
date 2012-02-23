@@ -8,7 +8,7 @@
 // http://www.sfml-dev.org/tutorials/1.6/window-window.php
 sf::WindowSettings settings(24, 8, 2);
 sf::Window window(sf::VideoMode(800, 600), "CS248 Rules!", sf::Style::Close, settings);
- 
+
 // This is a clock you can use to control animation.  For more info, see:
 // http://www.sfml-dev.org/tutorials/1.6/window-time.php
 sf::Clock clck;
@@ -23,6 +23,14 @@ void initOpenGL();
 void loadAssets();
 void handleInput();
 void renderFrame();
+
+#define GL_CHECK(x) {\
+(x);\
+GLenum error = glGetError();\
+if (GL_NO_ERROR != error) {\
+    printf("%s", gluErrorString(error));\
+}\
+}
 
 int main(int argc, char** argv) {
 
@@ -67,11 +75,11 @@ void initOpenGL() {
 
 
 void loadAssets() {
-    // Read in an asset file, and do some post-processing.  There is much 
+    // Read in an asset file, and do some post-processing.  There is much
     // more you can do with this asset loader, including load textures.
     // More info is here:
     // http://assimp.sourceforge.net/lib_html/usage.html
-    scene = importer.ReadFile(MODEL_PATH,  
+    scene = importer.ReadFile(MODEL_PATH,
         aiProcess_CalcTangentSpace |
         aiProcess_Triangulate |
         aiProcess_JoinIdenticalVertices |
@@ -81,7 +89,7 @@ void loadAssets() {
         std::cerr << importer.GetErrorString() << std::endl;
         exit(-1);
     }
-        
+
     //////////////////////////////////////////////////////////////////////////
     // TODO: LOAD YOUR SHADERS/TEXTURES
     //////////////////////////////////////////////////////////////////////////
@@ -100,29 +108,71 @@ void handleInput() {
     sf::Event evt;
     while (window.GetEvent(evt)) {
         switch (evt.Type) {
-        case sf::Event::Closed: 
+        case sf::Event::Closed:
             // Close the window.  This will cause the game loop to exit,
             // because the IsOpened() function will no longer return true.
-            window.Close(); 
+            window.Close();
             break;
-        case sf::Event::Resized: 
+        case sf::Event::Resized:
             // If the window is resized, then we need to change the perspective
             // transformation and viewport
             glViewport(0, 0, evt.Size.Width, evt.Size.Height);
             break;
-        default: 
+        default:
             break;
         }
     }
 }
 
 
+void recursive_render (const struct aiScene *sc, struct aiNode *nd) {
+    struct aiMatrix4x4 m = nd->mTransformation;
+    m.Transpose();
+    glPushMatrix();
+    glMultMatrixf((float*)&m);
+
+    for (int n = 0; n < nd->mNumMeshes; ++n) {
+        const struct aiMesh* mesh = sc->mMeshes[nd->mMeshes[n]];
+
+        //TODO: No materials.
+        //TODO: For now.
+        glEnable(GL_LIGHTING);
+
+        for (int t = 0; t < mesh->mNumFaces; ++t) {
+            const struct aiFace* face = &mesh->mFaces[t];
+
+            glBegin(GL_TRIANGLES);
+            for (int i = 0; i < face->mNumIndices; ++i) {
+                int index = face->mIndices[i];
+
+                if (mesh->mColors[0] != NULL) glColor4fv((GLfloat*) &mesh->mColors[0][index]);
+                if (mesh->mNormals   != NULL) glNormal3fv(&mesh->mNormals[index].x);
+                glVertex3fv(&mesh->mVertices[index].x);
+            }
+            glEnd();
+        }
+    }
+
+    for (int n = 0; n < nd->mNumChildren; ++n) {
+        recursive_render(sc, nd->mChildren[n]);
+    }
+
+    glPopMatrix();
+}
 
 
 void renderFrame() {
     //////////////////////////////////////////////////////////////////////////
-    // TODO: ADD YOUR RENDERING CODE HERE.  You may use as many .cpp files 
+    // TODO: ADD YOUR RENDERING CODE HERE.  You may use as many .cpp files
     // in this assignment as you wish.
     //////////////////////////////////////////////////////////////////////////
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    recursive_render(scene, scene->mRootNode);
 }
+
+
+
+
+
+
