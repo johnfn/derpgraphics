@@ -4,8 +4,15 @@
 #include "assimp.h"
 #include "aiPostProcess.h"
 #include "aiScene.h"
+#include <vector>
 
-#define MODEL_PATH "models/teapot.3ds"
+//TODO
+#define MODEL_PATH "/Users/grantm/class/cs248/assign3/models/teapot.3ds"
+#define SPEC_SUFFIX "_s.jpg"
+#define NORM_SUFFIX "_n.jpg"
+#define DIFF_SUFFIX "_d.jpg"
+
+using namespace std;
 
 // Note: See the SMFL documentation for info on setting up fullscreen mode
 // and using rendering settings
@@ -21,7 +28,6 @@ sf::Clock clck;
 // It automatically manages resources for you, and frees them when the program
 // exits.
 Assimp::Importer importer;
-const aiScene* scene;
 
 void initOpenGL();
 void loadAssets();
@@ -160,24 +166,53 @@ void initOpenGL() {
     glViewport(0, 0, window.GetWidth(), window.GetHeight());
 }
 
+struct asset {
+    const aiScene* scene;
+    sf::Image diff_texture;
+    sf::Image spec_texture;
+};
 
+vector<asset> assets;
 
+asset loadAsset(const char* name) {
+    asset a;
 
-void loadAssets() {
-    // Read in an asset file, and do some post-processing.  There is much
-    // more you can do with this asset loader, including load textures.
-    // More info is here:
-    // http://assimp.sourceforge.net/lib_html/usage.html
-    scene = importer.ReadFile(MODEL_PATH,
+    a.scene = importer.ReadFile(name,
         aiProcess_CalcTangentSpace |
         aiProcess_Triangulate |
         aiProcess_JoinIdenticalVertices |
         aiProcessPreset_TargetRealtime_Quality);
 
-    if (!scene || scene->mNumMeshes <= 0) {
+    if (!a.scene || a.scene->mNumMeshes <= 0) {
         std::cerr << importer.GetErrorString() << std::endl;
         exit(-1);
     }
+
+    cout << "GO" << endl;
+
+    if (a.scene->HasMaterials()) {
+        cout << "..." << endl;
+        aiString path;
+        for (int j = 0; j < a.scene->mNumMaterials; ++j) {
+            for (int i = 0; i < a.scene->mMaterials[j]->mNumAllocated; ++i) {
+                cout << i << endl;
+                a.scene->mMaterials[j]->GetTexture(aiTextureType_DIFFUSE, 0, &path);
+                cout << path.data << endl;
+            }
+        }
+    }
+
+    return a;
+}
+
+void loadAssets() {
+    asset a = loadAsset(MODEL_PATH);
+    assets.push_back(a);
+
+    // Read in an asset file, and do some post-processing.  There is much
+    // more you can do with this asset loader, including load textures.
+    // More info is here:
+    // http://assimp.sourceforge.net/lib_html/usage.html
 
     //////////////////////////////////////////////////////////////////////////
     // TODO: LOAD YOUR SHADERS/TEXTURES
@@ -185,7 +220,8 @@ void loadAssets() {
 }
 
 
-
+float dx = 0, dy = 0;
+float x = 0, y = 0;
 
 void handleInput() {
     //////////////////////////////////////////////////////////////////////////
@@ -197,18 +233,25 @@ void handleInput() {
     sf::Event evt;
     while (window.GetEvent(evt)) {
         switch (evt.Type) {
-        case sf::Event::Closed:
-            // Close the window.  This will cause the game loop to exit,
-            // because the IsOpened() function will no longer return true.
-            window.Close();
-            break;
-        case sf::Event::Resized:
-            // If the window is resized, then we need to change the perspective
-            // transformation and viewport
-            glViewport(0, 0, evt.Size.Width, evt.Size.Height);
-            break;
-        default:
-            break;
+            case sf::Event::Closed:
+                // Close the window.  This will cause the game loop to exit,
+                // because the IsOpened() function will no longer return true.
+                window.Close();
+                break;
+            case sf::Event::KeyPressed:
+                if (evt.Key.Code == sf::Key::W) dy -= .1;
+                if (evt.Key.Code == sf::Key::S) dy += .1;
+
+                if (evt.Key.Code == sf::Key::A) dx -= .1;
+                if (evt.Key.Code == sf::Key::D) dx += .1;
+
+            case sf::Event::Resized:
+                // If the window is resized, then we need to change the perspective
+                // transformation and viewport
+                glViewport(0, 0, evt.Size.Width, evt.Size.Height);
+                break;
+            default:
+                break;
         }
     }
 }
@@ -219,11 +262,11 @@ void recursive_render (const struct aiScene *sc, struct aiNode *nd) {
     m.Transpose();
     glPushMatrix();
     glMultMatrixf((float*)&m);
+    //glTranslatef(dx, dy, 0);
 
     for (int n = 0; n < nd->mNumMeshes; ++n) {
         const struct aiMesh* mesh = sc->mMeshes[nd->mMeshes[n]];
 
-        //TODO: No materials.
         //TODO: For now.
         glEnable(GL_LIGHTING);
 
@@ -232,9 +275,16 @@ void recursive_render (const struct aiScene *sc, struct aiNode *nd) {
 
             apply_material(sc->mMaterials[mesh->mMaterialIndex]);
 
-            assert(face->mNumIndices == 3);
+            GLenum face_mode;
 
-            glBegin(GL_TRIANGLES);
+            switch (face->mNumIndices) {
+                case 1:  face_mode = GL_POINTS;    break;
+                case 2:  face_mode = GL_LINES;     break;
+                case 3:  face_mode = GL_TRIANGLES; break;
+                default: face_mode = GL_POLYGON;   break;
+            }
+
+            glBegin(face_mode);
             for (int i = 0; i < face->mNumIndices; ++i) {
                 int index = face->mIndices[i];
 
@@ -261,7 +311,28 @@ void renderFrame() {
     //////////////////////////////////////////////////////////////////////////
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    recursive_render(scene, scene->mRootNode);
+    glMatrixMode( GL_PROJECTION );
+    glLoadIdentity();
+    glViewport(0, 0, window.GetWidth(), window.GetHeight());
+
+    // start fresh
+    glMatrixMode( GL_MODELVIEW );
+    glLoadIdentity();
+
+
+    if (dx != 0 || dy != 0) {
+        x += dx;
+        y += dy;
+        dx = 0;
+        dy = 0;
+    }
+    glTranslatef(x, y, 0);
+
+    cout << "RENDER" << endl;
+
+    for (int i = 0; i < assets.size(); ++i) {
+        recursive_render(assets[i].scene, assets[i].scene->mRootNode);
+    }
 }
 
 
