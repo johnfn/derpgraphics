@@ -8,7 +8,7 @@
 #include <fstream>
 
 //TODO
-#define MODEL_PATH "/Users/grantm/class/cs248/assign3/models/armadillo.3ds"
+#define MODEL_PATH "/Users/grantm/class/cs248/assign3/models/dragon.3ds"
 #define SPEC_SUFFIX "_s.jpg"
 #define NORM_SUFFIX "_n.jpg"
 #define DIFF_SUFFIX "_d.jpg"
@@ -40,6 +40,8 @@ void loadAssets();
 void handleInput();
 void renderFrame();
 void drawMesh(const struct aiMesh *mesh);
+void setMaterial(const struct aiScene *scene, const struct aiMesh *mesh);
+void setTextures();
 
 #define GL_CHECK(x) {\
 (x);\
@@ -228,11 +230,13 @@ void loadAssets() {
         exit(-1);
     }
 
+    /*
     diff_text.reset(new sf::Image());
-    diff_text->LoadFromFile("models/dragon-diffuse.jpg");
+    diff_text->LoadFromFile("/Users/grantm/class/cs248/assign3/models/dragon-diffuse.jpg");
 
     spec_text.reset(new sf::Image());
-    spec_text->LoadFromFile("models/dragon-specular.jpg");
+    spec_text->LoadFromFile("/Users/grantm/class/cs248/assign3/models/dragon-specular.jpg");
+    */
 
     //loadShader(fragShader, "/Users/grantm/class/cs248/assign3/shaders/phong.frag.glsl");
     //loadShader(vertShader, "/Users/grantm/class/cs248/assign3/shaders/phong.vert.glsl");
@@ -302,6 +306,7 @@ void recursive_render (const struct aiScene *sc, struct aiNode *nd) {
         //TODO: For now.
         glEnable(GL_LIGHTING);
 
+        setMaterial(sc, mesh);
         drawMesh(mesh);
     }
 
@@ -312,24 +317,56 @@ void recursive_render (const struct aiScene *sc, struct aiNode *nd) {
     glPopMatrix();
 }
 
+void setMaterial(const struct aiScene *scene, const struct aiMesh *mesh) {
+    /*
+    aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
+    aiColor3D color;
 
-/*
+    // Get a handle to the diffuse, specular, and ambient variables
+    // inside the shader.  Then set them with the diffuse, specular, and
+    // ambient color.
+    GLint diffuse = glGetUniformLocation(shader->programID(), "Kd");
+    material->Get(AI_MATKEY_COLOR_DIFFUSE, color);
+    glUniform3f(diffuse, color.r, color.g, color.b);
+
+    // Specular material
+    GLint specular = glGetUniformLocation(shader->programID(), "Ks");
+    material->Get(AI_MATKEY_COLOR_DIFFUSE, color);
+    glUniform3f(specular, color.r, color.g, color.b);
+
+    // Ambient material
+    GLint ambient = glGetUniformLocation(shader->programID(), "Ka");
+    material->Get(AI_MATKEY_COLOR_DIFFUSE, color);
+    glUniform3f(ambient, color.r, color.g, color.b);
+
+    // Specular power
+    GLint shininess = glGetUniformLocation(shader->programID(), "alpha");
+    float value;
+    if (AI_SUCCESS == material->Get(AI_MATKEY_SHININESS, value)) {
+        glUniform1f(shininess, value);
+    } else {
+        glUniform1f(shininess, 1);
+    }
+    */
+}
+
 void setTextures() {
     // Get a "handle" to the texture variables inside our shader.  Then
     // pass two textures to the shader: one for diffuse, and the other for
     // transparency.
+    /*
     GLint diffuse = glGetUniformLocation(shader->programID(), "diffuseMap");
     glUniform1i(diffuse, 0); // The diffuse map will be GL_TEXTURE0
     glActiveTexture(GL_TEXTURE0);
-    diffuseMap->Bind();
+    diff_text->Bind();
 
     // Transparency
     GLint specular = glGetUniformLocation(shader->programID(), "specularMap");
     glUniform1i(specular, 1); // The transparency map will be GL_TEXTURE1
     glActiveTexture(GL_TEXTURE1);
-    specularMap->Bind();
+    spec_text->Bind();
+    */
 }
-*/
 
 void drawMesh(const struct aiMesh *mesh) {
     vector<unsigned> indexBuffer;
@@ -396,8 +433,7 @@ void renderFrame() {
     glRotatef(rx, 0, rx, 0);
     glRotatef(ry, 0, ry, 0);
 
-
-    cout << "RENDER" << endl;
+    setTextures();
 
     for (int i = 0; i < assets.size(); ++i) {
         recursive_render(assets[i].scene, assets[i].scene->mRootNode);
