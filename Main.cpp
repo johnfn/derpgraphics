@@ -5,9 +5,10 @@
 #include "aiPostProcess.h"
 #include "aiScene.h"
 #include <vector>
+#include <fstream>
 
 //TODO
-#define MODEL_PATH "/Users/grantm/class/cs248/assign3/models/teapot.3ds"
+#define MODEL_PATH "/Users/grantm/class/cs248/assign3/models/armadillo.3ds"
 #define SPEC_SUFFIX "_s.jpg"
 #define NORM_SUFFIX "_n.jpg"
 #define DIFF_SUFFIX "_d.jpg"
@@ -24,6 +25,11 @@ sf::Window window(sf::VideoMode(800, 600), "CS248 Rules!", sf::Style::Close, set
 // http://www.sfml-dev.org/tutorials/1.6/window-time.php
 sf::Clock clck;
 
+std::auto_ptr<Shader> shader;
+
+std::auto_ptr<sf::Image> diff_text;
+std::auto_ptr<sf::Image> spec_text;
+
 // This creates an asset importer using the Open Asset Import library.
 // It automatically manages resources for you, and frees them when the program
 // exits.
@@ -33,6 +39,7 @@ void initOpenGL();
 void loadAssets();
 void handleInput();
 void renderFrame();
+void drawMesh(const struct aiMesh *mesh);
 
 #define GL_CHECK(x) {\
 (x);\
@@ -214,6 +221,23 @@ void loadAssets() {
     // More info is here:
     // http://assimp.sourceforge.net/lib_html/usage.html
 
+    shader.reset(new Shader("shaders/phong"));
+
+    if (!shader->loaded()) {
+        cerr << "Shader failed to load." << endl;
+        exit(-1);
+    }
+
+    diff_text.reset(new sf::Image());
+    diff_text->LoadFromFile("models/dragon-diffuse.jpg");
+
+    spec_text.reset(new sf::Image());
+    spec_text->LoadFromFile("models/dragon-specular.jpg");
+
+    //loadShader(fragShader, "/Users/grantm/class/cs248/assign3/shaders/phong.frag.glsl");
+    //loadShader(vertShader, "/Users/grantm/class/cs248/assign3/shaders/phong.vert.glsl");
+
+
     //////////////////////////////////////////////////////////////////////////
     // TODO: LOAD YOUR SHADERS/TEXTURES
     //////////////////////////////////////////////////////////////////////////
@@ -222,6 +246,7 @@ void loadAssets() {
 
 float dx = 0, dy = 0;
 float x = 0, y = 0;
+float rx = 0, ry = 0, drx = 0, dry = 0;
 
 void handleInput() {
     //////////////////////////////////////////////////////////////////////////
@@ -244,6 +269,13 @@ void handleInput() {
 
                 if (evt.Key.Code == sf::Key::A) dx -= .1;
                 if (evt.Key.Code == sf::Key::D) dx += .1;
+
+                if (evt.Key.Code == sf::Key::Up)   drx += 1;
+                if (evt.Key.Code == sf::Key::Down) drx -= 1;
+
+                if (evt.Key.Code == sf::Key::Left)   dry += 1;
+                if (evt.Key.Code == sf::Key::Right)  dry -= 1;
+
 
             case sf::Event::Resized:
                 // If the window is resized, then we need to change the perspective
@@ -270,30 +302,7 @@ void recursive_render (const struct aiScene *sc, struct aiNode *nd) {
         //TODO: For now.
         glEnable(GL_LIGHTING);
 
-        for (int t = 0; t < mesh->mNumFaces; ++t) {
-            const struct aiFace* face = &mesh->mFaces[t];
-
-            apply_material(sc->mMaterials[mesh->mMaterialIndex]);
-
-            GLenum face_mode;
-
-            switch (face->mNumIndices) {
-                case 1:  face_mode = GL_POINTS;    break;
-                case 2:  face_mode = GL_LINES;     break;
-                case 3:  face_mode = GL_TRIANGLES; break;
-                default: face_mode = GL_POLYGON;   break;
-            }
-
-            glBegin(face_mode);
-            for (int i = 0; i < face->mNumIndices; ++i) {
-                int index = face->mIndices[i];
-
-                if (mesh->mColors[0] != NULL) glColor4fv((GLfloat*) &mesh->mColors[0][index]);
-                if (mesh->mNormals   != NULL) glNormal3fv(&mesh->mNormals[index].x);
-                glVertex3fv(&mesh->mVertices[index].x);
-            }
-            glEnd();
-        }
+        drawMesh(mesh);
     }
 
     for (int n = 0; n < nd->mNumChildren; ++n) {
@@ -304,11 +313,61 @@ void recursive_render (const struct aiScene *sc, struct aiNode *nd) {
 }
 
 
+/*
+void setTextures() {
+    // Get a "handle" to the texture variables inside our shader.  Then
+    // pass two textures to the shader: one for diffuse, and the other for
+    // transparency.
+    GLint diffuse = glGetUniformLocation(shader->programID(), "diffuseMap");
+    glUniform1i(diffuse, 0); // The diffuse map will be GL_TEXTURE0
+    glActiveTexture(GL_TEXTURE0);
+    diffuseMap->Bind();
+
+    // Transparency
+    GLint specular = glGetUniformLocation(shader->programID(), "specularMap");
+    glUniform1i(specular, 1); // The transparency map will be GL_TEXTURE1
+    glActiveTexture(GL_TEXTURE1);
+    specularMap->Bind();
+}
+*/
+
+void drawMesh(const struct aiMesh *mesh) {
+    vector<unsigned> indexBuffer;
+
+    indexBuffer.reserve(mesh->mNumFaces * 3);
+    for (unsigned i = 0; i < mesh->mNumFaces; i++) {
+        for (unsigned j = 0; j < mesh->mFaces[i].mNumIndices; j++) {
+            indexBuffer.push_back(mesh->mFaces[i].mIndices[j]);
+        }
+    }
+
+    // Get a handle to the variables for the vertex data inside the shader.
+    GLint position = glGetAttribLocation(shader->programID(), "positionIn");
+    glEnableVertexAttribArray(position);
+    glVertexAttribPointer(position, 3, GL_FLOAT, 0, sizeof(aiVector3D), mesh->mVertices);
+
+    // Texture coords.  Note the [0] at the end, very important
+    GLint texcoord = glGetAttribLocation(shader->programID(), "texcoordIn");
+    glEnableVertexAttribArray(texcoord);
+    glVertexAttribPointer(texcoord, 2, GL_FLOAT, 0, sizeof(aiVector3D), mesh->mTextureCoords[0]);
+
+    // Normals
+    GLint normal = glGetAttribLocation(shader->programID(), "normalIn");
+    glEnableVertexAttribArray(normal);
+    glVertexAttribPointer(normal, 3, GL_FLOAT, 0, sizeof(aiVector3D), mesh->mNormals);
+
+    glDrawElements(GL_TRIANGLES, 3 * mesh->mNumFaces, GL_UNSIGNED_INT, &indexBuffer[0]);
+}
+
+
 void renderFrame() {
     //////////////////////////////////////////////////////////////////////////
     // TODO: ADD YOUR RENDERING CODE HERE.  You may use as many .cpp files
     // in this assignment as you wish.
     //////////////////////////////////////////////////////////////////////////
+
+    glUseProgram(shader->programID());
+
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     glMatrixMode( GL_PROJECTION );
@@ -327,6 +386,16 @@ void renderFrame() {
         dy = 0;
     }
     glTranslatef(x, y, 0);
+
+    if (drx != 0 || dry != 0) {
+        rx += drx * 5;
+        ry += dry * 5;
+        drx = 0;
+        dry = 0;
+    }
+    glRotatef(rx, 0, rx, 0);
+    glRotatef(ry, 0, ry, 0);
+
 
     cout << "RENDER" << endl;
 
