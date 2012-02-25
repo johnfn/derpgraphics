@@ -8,7 +8,7 @@
 #include <fstream>
 
 //TODO
-#define MODEL_PATH "/Users/grantm/class/cs248/assign3/models/dragon.3ds"
+#define MODEL_PATH "/Users/grantm/class/cs248/assign3/models/cathedral.3ds"
 #define SPEC_SUFFIX "_s.jpg"
 #define NORM_SUFFIX "_n.jpg"
 #define DIFF_SUFFIX "_d.jpg"
@@ -20,6 +20,8 @@ using namespace std;
 // http://www.sfml-dev.org/tutorials/1.6/window-window.php
 sf::WindowSettings settings(24, 8, 2);
 sf::Window window(sf::VideoMode(800, 600), "CS248 Rules!", sf::Style::Close, settings);
+
+std::map<pair<int, aiTextureType>, sf::Image*> textureIdMap; //TODO: Not an ID map any more.
 
 // This is a clock you can use to control animation.  For more info, see:
 // http://www.sfml-dev.org/tutorials/1.6/window-time.php
@@ -69,72 +71,6 @@ void set_float4(float f[4], float a, float b, float c, float d)
     f[2] = c;
     f[3] = d;
 }
-
-void apply_material(const struct aiMaterial *mtl)
-{
-    float c[4];
-
-    GLenum fill_mode;
-    int ret1, ret2;
-    struct aiColor4D diffuse;
-    struct aiColor4D specular;
-    struct aiColor4D ambient;
-    struct aiColor4D emission;
-    float shininess, strength;
-    int two_sided;
-    int wireframe;
-    unsigned int max;
-
-    set_float4(c, 0.8f, 0.8f, 0.8f, 1.0f);
-    if(AI_SUCCESS == aiGetMaterialColor(mtl, AI_MATKEY_COLOR_DIFFUSE, &diffuse))
-            color4_to_float4(&diffuse, c);
-    glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, c);
-
-    set_float4(c, 0.0f, 0.0f, 0.0f, 1.0f);
-    if(AI_SUCCESS == aiGetMaterialColor(mtl, AI_MATKEY_COLOR_SPECULAR, &specular))
-            color4_to_float4(&specular, c);
-    glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, c);
-
-    set_float4(c, 0.2f, 0.2f, 0.2f, 1.0f);
-    if(AI_SUCCESS == aiGetMaterialColor(mtl, AI_MATKEY_COLOR_AMBIENT, &ambient))
-            color4_to_float4(&ambient, c);
-    glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, c);
-
-    set_float4(c, 0.0f, 0.0f, 0.0f, 1.0f);
-    if(AI_SUCCESS == aiGetMaterialColor(mtl, AI_MATKEY_COLOR_EMISSIVE, &emission))
-            color4_to_float4(&emission, c);
-    glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION, c);
-
-    max = 1;
-    ret1 = aiGetMaterialFloatArray(mtl, AI_MATKEY_SHININESS, &shininess, &max);
-    if(ret1 == AI_SUCCESS) {
-    max = 1;
-    ret2 = aiGetMaterialFloatArray(mtl, AI_MATKEY_SHININESS_STRENGTH, &strength, &max);
-            if(ret2 == AI_SUCCESS)
-                    glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, shininess * strength);
-    else
-            glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, shininess);
-    }
-    else {
-            glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, 0.0f);
-            set_float4(c, 0.0f, 0.0f, 0.0f, 0.0f);
-            glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, c);
-    }
-
-    max = 1;
-    if(AI_SUCCESS == aiGetMaterialIntegerArray(mtl, AI_MATKEY_ENABLE_WIREFRAME, &wireframe, &max))
-            fill_mode = wireframe ? GL_LINE : GL_FILL;
-    else
-            fill_mode = GL_FILL;
-    glPolygonMode(GL_FRONT_AND_BACK, fill_mode);
-
-    max = 1;
-    if((AI_SUCCESS == aiGetMaterialIntegerArray(mtl, AI_MATKEY_TWOSIDED, &two_sided, &max)) && two_sided)
-            glDisable(GL_CULL_FACE);
-    else
-            glEnable(GL_CULL_FACE);
-}
-
 
 int main(int argc, char** argv) {
 
@@ -231,11 +167,6 @@ void loadAssets() {
     }
 
     /*
-    diff_text.reset(new sf::Image());
-    diff_text->LoadFromFile("/Users/grantm/class/cs248/assign3/models/dragon-diffuse.jpg");
-
-    spec_text.reset(new sf::Image());
-    spec_text->LoadFromFile("/Users/grantm/class/cs248/assign3/models/dragon-specular.jpg");
     */
 
     //loadShader(fragShader, "/Users/grantm/class/cs248/assign3/shaders/phong.frag.glsl");
@@ -303,10 +234,31 @@ void recursive_render (const struct aiScene *sc, struct aiNode *nd) {
     for (int n = 0; n < nd->mNumMeshes; ++n) {
         const struct aiMesh* mesh = sc->mMeshes[nd->mMeshes[n]];
 
-        //TODO: For now.
+        if (mesh->mPrimitiveTypes <= aiPrimitiveType_LINE) continue;
+
+        //TODO: For now. I think I saw someone checking normals and then setting this accordingly.
         glEnable(GL_LIGHTING);
 
-        setMaterial(sc, mesh);
+        // where doing this man
+        // where MAKING THIS HAPEN
+
+        unsigned int idx = mesh->mMaterialIndex;
+
+        // Get a "handle" to the texture variables inside our shader.  Then
+        // pass two textures to the shader: one for diffuse, and the other for
+        // transparency.
+        GLint diffuse = glGetUniformLocation(shader->programID(), "diffuseMap");
+        glUniform1i(diffuse, 0); // The diffuse map will be GL_TEXTURE0
+        glActiveTexture(GL_TEXTURE0);
+        textureIdMap[make_pair(idx, aiTextureType_DIFFUSE)]->Bind();
+
+        // Transparency
+        GLint specular = glGetUniformLocation(shader->programID(), "specularMap");
+        glUniform1i(specular, 1); // The transparency map will be GL_TEXTURE1
+        glActiveTexture(GL_TEXTURE1);
+        textureIdMap[make_pair(idx, aiTextureType_SPECULAR)]->Bind();
+
+        //setMaterial(sc, mesh);
         drawMesh(mesh);
     }
 
@@ -317,8 +269,123 @@ void recursive_render (const struct aiScene *sc, struct aiNode *nd) {
     glPopMatrix();
 }
 
+//
+//Code borrowed with some modification from http://assimp.svn.sourceforge.net/viewvc/assimp/trunk/samples/SimpleTexturedOpenGL/SimpleTexturedOpenGL/src/model_loading.cpp?revision=1171&content-type=text%2Fplain
+//
+
+void LoadGLTextures(const aiScene* scene) {
+    assert(!scene->HasTextures());
+
+    //Map each path to a loaded texture file.
+    for (unsigned int i = 0; i < scene->mNumMaterials; ++i) {
+        aiString path;
+
+        if (AI_SUCCESS == scene->mMaterials[i]->GetTexture(aiTextureType_DIFFUSE, i, &path)) {
+            cout << "path is " << path.data << endl;
+            sf::Image *img_diff = new sf::Image();
+            img_diff->LoadFromFile(path.data);
+            textureIdMap[make_pair(i, aiTextureType_DIFFUSE)] = img_diff;
+        }
+
+        if (AI_SUCCESS == scene->mMaterials[i]->GetTexture(aiTextureType_SPECULAR, i, &path)) {
+            cout << "path is " << path.data << endl;
+            sf::Image *img_spec = new sf::Image();
+            img_spec->LoadFromFile(path.data);
+            textureIdMap[make_pair(i, aiTextureType_SPECULAR)] = img_spec;
+        }
+    }
+    /*for (unsigned int m=0; m<scene->mNumMaterials; m++) {
+        int texIndex = 0;
+        aiReturn texFound = AI_SUCCESS;
+
+        aiString path;  // filename
+
+        while (texFound == AI_SUCCESS)
+        {
+            texFound = scene->mMaterials[m]->GetTexture(aiTextureType_DIFFUSE, texIndex, &path);
+            sf::Image *img = new sf::Image();
+            img->LoadFromFile(path.data);
+            textureIdMap[path.data] = img; //fill map with textures, pointers still NULL yet
+            texIndex++;
+        }
+    }
+    */
+}
+
+/*
+void apply_material(const aiMaterial *mtl)
+{
+    float c[4];
+
+    GLenum fill_mode;
+    int ret1, ret2;
+    aiColor4D diffuse;
+    aiColor4D specular;
+    aiColor4D ambient;
+    aiColor4D emission;
+    float shininess, strength;
+    int two_sided;
+    int wireframe;
+    unsigned int max;   // changed: to unsigned
+
+    int texIndex = 0;
+    aiString texPath;   //contains filename of texture
+
+    if(AI_SUCCESS == mtl->GetTexture(aiTextureType_DIFFUSE, texIndex, &texPath))
+    {
+        //bind texture
+        unsigned int texId = *textureIdMap[texPath.data];
+        glBindTexture(GL_TEXTURE_2D, texId);
+    }
+
+    set_float4(c, 0.8f, 0.8f, 0.8f, 1.0f);
+    if(AI_SUCCESS == aiGetMaterialColor(mtl, AI_MATKEY_COLOR_DIFFUSE, &diffuse))
+        color4_to_float4(&diffuse, c);
+    glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, c);
+
+    set_float4(c, 0.0f, 0.0f, 0.0f, 1.0f);
+    if(AI_SUCCESS == aiGetMaterialColor(mtl, AI_MATKEY_COLOR_SPECULAR, &specular))
+        color4_to_float4(&specular, c);
+    glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, c);
+
+    set_float4(c, 0.2f, 0.2f, 0.2f, 1.0f);
+    if(AI_SUCCESS == aiGetMaterialColor(mtl, AI_MATKEY_COLOR_AMBIENT, &ambient))
+        color4_to_float4(&ambient, c);
+    glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, c);
+
+    set_float4(c, 0.0f, 0.0f, 0.0f, 1.0f);
+    if(AI_SUCCESS == aiGetMaterialColor(mtl, AI_MATKEY_COLOR_EMISSIVE, &emission))
+        color4_to_float4(&emission, c);
+    glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION, c);
+
+    max = 1;
+    ret1 = aiGetMaterialFloatArray(mtl, AI_MATKEY_SHININESS, &shininess, &max);
+    max = 1;
+    ret2 = aiGetMaterialFloatArray(mtl, AI_MATKEY_SHININESS_STRENGTH, &strength, &max);
+    if((ret1 == AI_SUCCESS) && (ret2 == AI_SUCCESS))
+        glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, shininess * strength);
+    else {
+        glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, 0.0f);
+        set_float4(c, 0.0f, 0.0f, 0.0f, 0.0f);
+        glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, c);
+    }
+
+    max = 1;
+    if(AI_SUCCESS == aiGetMaterialIntegerArray(mtl, AI_MATKEY_ENABLE_WIREFRAME, &wireframe, &max))
+        fill_mode = wireframe ? GL_LINE : GL_FILL;
+    else
+        fill_mode = GL_FILL;
+    glPolygonMode(GL_FRONT_AND_BACK, fill_mode);
+
+    max = 1;
+    if((AI_SUCCESS == aiGetMaterialIntegerArray(mtl, AI_MATKEY_TWOSIDED, &two_sided, &max)) && two_sided)
+        glEnable(GL_CULL_FACE);
+    else
+        glDisable(GL_CULL_FACE);
+}
+*/
+
 void setMaterial(const struct aiScene *scene, const struct aiMesh *mesh) {
-    /*
     aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
     aiColor3D color;
 
@@ -347,14 +414,12 @@ void setMaterial(const struct aiScene *scene, const struct aiMesh *mesh) {
     } else {
         glUniform1f(shininess, 1);
     }
-    */
 }
 
 void setTextures() {
     // Get a "handle" to the texture variables inside our shader.  Then
     // pass two textures to the shader: one for diffuse, and the other for
     // transparency.
-    /*
     GLint diffuse = glGetUniformLocation(shader->programID(), "diffuseMap");
     glUniform1i(diffuse, 0); // The diffuse map will be GL_TEXTURE0
     glActiveTexture(GL_TEXTURE0);
@@ -365,7 +430,6 @@ void setTextures() {
     glUniform1i(specular, 1); // The transparency map will be GL_TEXTURE1
     glActiveTexture(GL_TEXTURE1);
     spec_text->Bind();
-    */
 }
 
 void drawMesh(const struct aiMesh *mesh) {
@@ -433,7 +497,7 @@ void renderFrame() {
     glRotatef(rx, 0, rx, 0);
     glRotatef(ry, 0, ry, 0);
 
-    setTextures();
+    //setTextures();
 
     for (int i = 0; i < assets.size(); ++i) {
         recursive_render(assets[i].scene, assets[i].scene->mRootNode);
