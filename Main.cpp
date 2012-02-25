@@ -46,6 +46,7 @@ void drawMesh(const struct aiMesh *mesh);
 void setMaterial(const struct aiScene *scene, const struct aiMesh *mesh);
 void setTextures();
 void LoadGLTextures(const aiScene* scene);
+void apply_material(const aiMaterial *mtl);
 
 #define GL_CHECK(x) {\
 (x);\
@@ -242,6 +243,12 @@ void recursive_render (const struct aiScene *sc, struct aiNode *nd) {
         // pass two textures to the shader: one for diffuse, and the other for
         // transparency.
 
+        //apply_material(mtl);
+        setMaterial(sc, mesh);
+
+        glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT );
+        glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT );
+
         if(AI_SUCCESS == mtl->GetTexture(aiTextureType_DIFFUSE, 0 /*texIndex*/, &texPath)) {
             string strpath(texPath.data);
             GLint diffuse = glGetUniformLocation(shader->programID(), "diffuseMap");
@@ -258,7 +265,6 @@ void recursive_render (const struct aiScene *sc, struct aiNode *nd) {
             textureIdMap[make_pair(strpath, aiTextureType_SPECULAR)]->Bind();
         }
 
-        //setMaterial(sc, mesh);
         drawMesh(mesh);
     }
 
@@ -279,17 +285,13 @@ void LoadGLTextures(const aiScene* scene) {
     //Map each path to a loaded texture file.
     for (unsigned int i = 0; i < scene->mNumMaterials; ++i) {
         for (unsigned int k = 0; k < scene->mMaterials[i]->mNumAllocated; k++) {
-            cout << " i is " << i << endl;
             aiString path;
 
             if (AI_SUCCESS == scene->mMaterials[i]->GetTexture(aiTextureType_DIFFUSE, k, &path)) {
                 string strpath(path.data);
-                cout << "path is " << path.data << endl;
                 string filename(BASE_PATH);
                 filename += path.data;
                 filename += "_d.jpg"; //TODO: Dehack.
-
-                cout << filename << endl;
 
                 sf::Image *img_diff = new sf::Image();
                 img_diff->LoadFromFile(filename);
@@ -298,7 +300,6 @@ void LoadGLTextures(const aiScene* scene) {
 
             if (AI_SUCCESS == scene->mMaterials[i]->GetTexture(aiTextureType_SPECULAR, k, &path)) {
                 string strpath(path.data);
-                cout << "path is " << path.data << endl;
                 string filename(BASE_PATH);
                 filename += path.data;
                 filename += "_s.jpg"; //TODO: Dehack.
@@ -327,7 +328,6 @@ void LoadGLTextures(const aiScene* scene) {
     */
 }
 
-/*
 void apply_material(const aiMaterial *mtl)
 {
     float c[4];
@@ -343,15 +343,14 @@ void apply_material(const aiMaterial *mtl)
     int wireframe;
     unsigned int max;   // changed: to unsigned
 
-    int texIndex = 0;
-    aiString texPath;   //contains filename of texture
-
+    /*
     if(AI_SUCCESS == mtl->GetTexture(aiTextureType_DIFFUSE, texIndex, &texPath))
     {
         //bind texture
         unsigned int texId = *textureIdMap[texPath.data];
         glBindTexture(GL_TEXTURE_2D, texId);
     }
+    */
 
     set_float4(c, 0.8f, 0.8f, 0.8f, 1.0f);
     if(AI_SUCCESS == aiGetMaterialColor(mtl, AI_MATKEY_COLOR_DIFFUSE, &diffuse))
@@ -398,7 +397,6 @@ void apply_material(const aiMaterial *mtl)
     else
         glDisable(GL_CULL_FACE);
 }
-*/
 
 void setMaterial(const struct aiScene *scene, const struct aiMesh *mesh) {
     aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
@@ -482,8 +480,28 @@ void renderFrame() {
     // in this assignment as you wish.
     //////////////////////////////////////////////////////////////////////////
 
+
+    GLfloat aspectRatio = (GLfloat)window.GetWidth()/window.GetHeight();
+    GLfloat nearClip = 0.1f;
+    GLfloat farClip = 500.0f;
+    GLfloat fieldOfView = 45.0f; // Degrees
+
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    gluPerspective(fieldOfView, aspectRatio, nearClip, farClip);
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+    gluLookAt(0.0f, 2.0f, -12.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+
+    // Add a little rotation, using the elapsed time for smooth animation
+    static float elapsed = 0.0f;
+    elapsed += clck.GetElapsedTime();
+    clck.Reset();
+    glRotatef(20*elapsed, 0, 1, 0);
+
     glUseProgram(shader->programID());
 
+/*
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     glMatrixMode( GL_PROJECTION );
@@ -511,6 +529,7 @@ void renderFrame() {
     }
     glRotatef(rx, 0, rx, 0);
     glRotatef(ry, 0, ry, 0);
+    */
 
     //setTextures();
 
