@@ -244,10 +244,10 @@ void recursive_render (const struct aiScene *sc, struct aiNode *nd) {
         // transparency.
 
         //apply_material(mtl);
-        setMaterial(sc, mesh);
-
         glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT );
         glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT );
+
+        setMaterial(sc, mesh);
 
         if(AI_SUCCESS == mtl->GetTexture(aiTextureType_DIFFUSE, 0 /*texIndex*/, &texPath)) {
             string strpath(texPath.data);
@@ -305,7 +305,7 @@ void LoadGLTextures(const aiScene* scene) {
                 filename += "_s.jpg"; //TODO: Dehack.
 
                 sf::Image *img_spec = new sf::Image();
-                img_spec->LoadFromFile(path.data);
+                img_spec->LoadFromFile(filename);
                 textureIdMap[make_pair(strpath, aiTextureType_SPECULAR)] = img_spec;
             }
         }
