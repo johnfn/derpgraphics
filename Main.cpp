@@ -260,7 +260,7 @@ void recursive_render (const struct aiScene *sc, struct aiNode *nd) {
         if(AI_SUCCESS == mtl->GetTexture(aiTextureType_SPECULAR, 0 /*texIndex*/, &texPath)) {
             string strpath(texPath.data);
             GLint specular = glGetUniformLocation(shader->programID(), "specularMap");
-            glUniform1i(specular, 0); // The diffuse map will be GL_TEXTURE0
+            glUniform1i(specular, 1); // The diffuse map will be GL_TEXTURE0
             glActiveTexture(GL_TEXTURE1);
             textureIdMap[make_pair(strpath, aiTextureType_SPECULAR)]->Bind();
         }
@@ -285,12 +285,12 @@ void LoadGLTextures(const aiScene* scene) {
     //Map each path to a loaded texture file.
     for (unsigned int i = 0; i < scene->mNumMaterials; ++i) {
         for (unsigned int k = 0; k < scene->mMaterials[i]->mNumAllocated; k++) {
-            aiString path;
+            aiString path1, path2;
 
-            if (AI_SUCCESS == scene->mMaterials[i]->GetTexture(aiTextureType_DIFFUSE, k, &path)) {
-                string strpath(path.data);
+            if (AI_SUCCESS == scene->mMaterials[i]->GetTexture(aiTextureType_DIFFUSE, k, &path1)) {
+                string strpath(path1.data);
                 string filename(BASE_PATH);
-                filename += path.data;
+                filename += path1.data;
                 filename += "_d.jpg"; //TODO: Dehack.
 
                 sf::Image *img_diff = new sf::Image();
@@ -298,10 +298,10 @@ void LoadGLTextures(const aiScene* scene) {
                 textureIdMap[make_pair(strpath, aiTextureType_DIFFUSE)] = img_diff;
             }
 
-            if (AI_SUCCESS == scene->mMaterials[i]->GetTexture(aiTextureType_SPECULAR, k, &path)) {
-                string strpath(path.data);
+            if (AI_SUCCESS == scene->mMaterials[i]->GetTexture(aiTextureType_SPECULAR, k, &path2)) {
+                string strpath(path2.data);
                 string filename(BASE_PATH);
-                filename += path.data;
+                filename += path2.data;
                 filename += "_s.jpg"; //TODO: Dehack.
 
                 sf::Image *img_spec = new sf::Image();
@@ -480,6 +480,9 @@ void renderFrame() {
     // in this assignment as you wish.
     //////////////////////////////////////////////////////////////////////////
 
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    glUseProgram(shader->programID());
 
     GLfloat aspectRatio = (GLfloat)window.GetWidth()/window.GetHeight();
     GLfloat nearClip = 0.1f;
@@ -499,10 +502,7 @@ void renderFrame() {
     clck.Reset();
     glRotatef(20*elapsed, 0, 1, 0);
 
-    glUseProgram(shader->programID());
-
 /*
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     glMatrixMode( GL_PROJECTION );
     glLoadIdentity();
