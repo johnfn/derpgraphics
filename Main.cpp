@@ -8,6 +8,7 @@
 #include <fstream>
 
 //TODO
+#define BASE_PATH "/Users/grantm/class/cs248/assign3/models/"
 #define MODEL_PATH "/Users/grantm/class/cs248/assign3/models/cathedral.3ds"
 #define SPEC_SUFFIX "_s.jpg"
 #define NORM_SUFFIX "_n.jpg"
@@ -21,7 +22,7 @@ using namespace std;
 sf::WindowSettings settings(24, 8, 2);
 sf::Window window(sf::VideoMode(800, 600), "CS248 Rules!", sf::Style::Close, settings);
 
-std::map<pair<int, aiTextureType>, sf::Image*> textureIdMap; //TODO: Not an ID map any more.
+std::map<pair<string, aiTextureType>, sf::Image*> textureIdMap; //TODO: Not an ID map any more.
 
 // This is a clock you can use to control animation.  For more info, see:
 // http://www.sfml-dev.org/tutorials/1.6/window-time.php
@@ -44,6 +45,7 @@ void renderFrame();
 void drawMesh(const struct aiMesh *mesh);
 void setMaterial(const struct aiScene *scene, const struct aiMesh *mesh);
 void setTextures();
+void LoadGLTextures(const aiScene* scene);
 
 #define GL_CHECK(x) {\
 (x);\
@@ -134,18 +136,7 @@ asset loadAsset(const char* name) {
     }
 
     cout << "GO" << endl;
-
-    if (a.scene->HasMaterials()) {
-        cout << "..." << endl;
-        aiString path;
-        for (int j = 0; j < a.scene->mNumMaterials; ++j) {
-            for (int i = 0; i < a.scene->mMaterials[j]->mNumAllocated; ++i) {
-                cout << i << endl;
-                a.scene->mMaterials[j]->GetTexture(aiTextureType_DIFFUSE, 0, &path);
-                cout << path.data << endl;
-            }
-        }
-    }
+    LoadGLTextures(a.scene); //TODO move into loadassets
 
     return a;
 }
@@ -242,21 +233,30 @@ void recursive_render (const struct aiScene *sc, struct aiNode *nd) {
         // where doing this man
         // where MAKING THIS HAPEN
 
-        unsigned int idx = mesh->mMaterialIndex;
+        const struct aiMaterial *mtl = sc->mMaterials[mesh->mMaterialIndex];
+        aiString texPath;
+
+        //texIndex ?!?
 
         // Get a "handle" to the texture variables inside our shader.  Then
         // pass two textures to the shader: one for diffuse, and the other for
         // transparency.
-        GLint diffuse = glGetUniformLocation(shader->programID(), "diffuseMap");
-        glUniform1i(diffuse, 0); // The diffuse map will be GL_TEXTURE0
-        glActiveTexture(GL_TEXTURE0);
-        textureIdMap[make_pair(idx, aiTextureType_DIFFUSE)]->Bind();
 
-        // Transparency
-        GLint specular = glGetUniformLocation(shader->programID(), "specularMap");
-        glUniform1i(specular, 1); // The transparency map will be GL_TEXTURE1
-        glActiveTexture(GL_TEXTURE1);
-        textureIdMap[make_pair(idx, aiTextureType_SPECULAR)]->Bind();
+        if(AI_SUCCESS == mtl->GetTexture(aiTextureType_DIFFUSE, 0 /*texIndex*/, &texPath)) {
+            string strpath(texPath.data);
+            GLint diffuse = glGetUniformLocation(shader->programID(), "diffuseMap");
+            glUniform1i(diffuse, 0); // The diffuse map will be GL_TEXTURE0
+            glActiveTexture(GL_TEXTURE0);
+            textureIdMap[make_pair(strpath, aiTextureType_DIFFUSE)]->Bind();
+        }
+
+        if(AI_SUCCESS == mtl->GetTexture(aiTextureType_SPECULAR, 0 /*texIndex*/, &texPath)) {
+            string strpath(texPath.data);
+            GLint specular = glGetUniformLocation(shader->programID(), "specularMap");
+            glUniform1i(specular, 0); // The diffuse map will be GL_TEXTURE0
+            glActiveTexture(GL_TEXTURE1);
+            textureIdMap[make_pair(strpath, aiTextureType_SPECULAR)]->Bind();
+        }
 
         //setMaterial(sc, mesh);
         drawMesh(mesh);
@@ -278,20 +278,35 @@ void LoadGLTextures(const aiScene* scene) {
 
     //Map each path to a loaded texture file.
     for (unsigned int i = 0; i < scene->mNumMaterials; ++i) {
-        aiString path;
+        for (unsigned int k = 0; k < scene->mMaterials[i]->mNumAllocated; k++) {
+            cout << " i is " << i << endl;
+            aiString path;
 
-        if (AI_SUCCESS == scene->mMaterials[i]->GetTexture(aiTextureType_DIFFUSE, i, &path)) {
-            cout << "path is " << path.data << endl;
-            sf::Image *img_diff = new sf::Image();
-            img_diff->LoadFromFile(path.data);
-            textureIdMap[make_pair(i, aiTextureType_DIFFUSE)] = img_diff;
-        }
+            if (AI_SUCCESS == scene->mMaterials[i]->GetTexture(aiTextureType_DIFFUSE, k, &path)) {
+                string strpath(path.data);
+                cout << "path is " << path.data << endl;
+                string filename(BASE_PATH);
+                filename += path.data;
+                filename += "_d.jpg"; //TODO: Dehack.
 
-        if (AI_SUCCESS == scene->mMaterials[i]->GetTexture(aiTextureType_SPECULAR, i, &path)) {
-            cout << "path is " << path.data << endl;
-            sf::Image *img_spec = new sf::Image();
-            img_spec->LoadFromFile(path.data);
-            textureIdMap[make_pair(i, aiTextureType_SPECULAR)] = img_spec;
+                cout << filename << endl;
+
+                sf::Image *img_diff = new sf::Image();
+                img_diff->LoadFromFile(filename);
+                textureIdMap[make_pair(strpath, aiTextureType_DIFFUSE)] = img_diff;
+            }
+
+            if (AI_SUCCESS == scene->mMaterials[i]->GetTexture(aiTextureType_SPECULAR, k, &path)) {
+                string strpath(path.data);
+                cout << "path is " << path.data << endl;
+                string filename(BASE_PATH);
+                filename += path.data;
+                filename += "_s.jpg"; //TODO: Dehack.
+
+                sf::Image *img_spec = new sf::Image();
+                img_spec->LoadFromFile(path.data);
+                textureIdMap[make_pair(strpath, aiTextureType_SPECULAR)] = img_spec;
+            }
         }
     }
     /*for (unsigned int m=0; m<scene->mNumMaterials; m++) {
