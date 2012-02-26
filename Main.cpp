@@ -118,7 +118,7 @@ asset loadAsset(const char* name) {
     }
 
     cout << "GO" << endl;
-    LoadGLTextures(a.scene); //TODO move into loadassets
+    LoadGLTextures(a.scene);
 
     return a;
 }
@@ -217,13 +217,18 @@ void apply_texture(const aiTextureType type, const GLenum textureNum, const stri
         case 2: glActiveTexture(GL_TEXTURE2); break;
         default: assert("unsupported texture number"); break;
     }
+    sf::Image *img = textureIdMap[make_pair(strpath, type)];
+
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    int w = textureIdMap[make_pair(strpath, type)]->GetWidth();
-    int h = textureIdMap[make_pair(strpath, type)]->GetHeight();
-    //gluBuild2DMipmaps(GL_TEXTURE_2D, GL_RGBA, GLsizei width, GLsizei height, GLenum format, GLenum type, const void *data)
 
-    textureIdMap[make_pair(strpath, type)]->Bind();
+    /* With thanks to http://stackoverflow.com/questions/5436487/how-would-i-be-able-to-use-glu-rgba-or-other-glu-parameters */
+    //TODO: Far too slow. Preprocess.
+    //gluBuild2DMipmaps(GL_TEXTURE_2D, GL_RGBA, img->GetWidth(), img->GetHeight(), GL_RGBA, GL_UNSIGNED_BYTE, img->GetPixelsPtr());
+    //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+
+    img->Bind();
 }
 
 void recursive_render (const struct aiScene *sc, struct aiNode *nd) {
