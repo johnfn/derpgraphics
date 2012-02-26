@@ -207,11 +207,16 @@ void handleInput() {
 }
 
 //strType == diffuseMap (for instance.)
-void apply_texture(aiTextureType type, GLenum textureNum, string strType, string strpath) {
+void apply_texture(const aiTextureType type, const GLenum textureNum, const string strType, const string strpath) {
     GLint loc = glGetUniformLocation(shader->programID(), strType.c_str());
-    glUniform1i(loc, textureNum); // The diffuse map will be GL_TEXTURE0
+    glUniform1i(loc, textureNum); // The diffuse map will be
 
-    glActiveTexture(textureNum);
+    switch (textureNum) {
+        case 0: glActiveTexture(GL_TEXTURE0); break;
+        case 1: glActiveTexture(GL_TEXTURE1); break;
+        case 2: glActiveTexture(GL_TEXTURE2); break;
+        default: assert("unsupported texture number"); break;
+    }
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     int w = textureIdMap[make_pair(strpath, type)]->GetWidth();
@@ -259,13 +264,13 @@ void recursive_render (const struct aiScene *sc, struct aiNode *nd) {
             apply_texture(aiTextureType_DIFFUSE, 0, "diffuseMap", strpath);
 
             /* Specular */
-            apply_texture(aiTextureType_DIFFUSE, 1, "specularMap", strpath);
+            apply_texture(aiTextureType_SPECULAR, 1, "specularMap", strpath);
 
             if (textureIdMap.count(make_pair(strpath, aiTextureType_NORMALS)) != 0) {
                 GLint hasNormal = glGetUniformLocation(shader->programID(), "hasNormalMapping");
                 glUniform1i(hasNormal, true);
 
-                apply_texture(aiTextureType_DIFFUSE, 2, "normalMap", strpath);
+                apply_texture(aiTextureType_NORMALS, 2, "normalMap", strpath);
             }
         }
 
@@ -452,13 +457,15 @@ void renderFrame() {
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
     gluPerspective(fieldOfView, aspectRatio, nearClip, farClip);
+
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
     gluLookAt(0.0f, 2.0f, -12.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
 
     // Add a little rotation, using the elapsed time for smooth animation
+
     glRotatef(mx, 0, 1, 0);
-    glRotatef(my, 0, 0, 1);
+    //glRotatef(my, 0, 0, 1);
 
     GLfloat light_ambient[] = { 0.2, 0.2, 0.2, 1.0 };
     GLfloat light_diffuse[] = { 1.0, 1.0, 1.0, 1.0 };
