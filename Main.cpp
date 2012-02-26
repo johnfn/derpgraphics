@@ -303,6 +303,12 @@ bool fexists(const char *filename) {
 //Code borrowed with some modification from http://assimp.svn.sourceforge.net/viewvc/assimp/trunk/samples/SimpleTexturedOpenGL/SimpleTexturedOpenGL/src/model_loading.cpp?revision=1171&content-type=text%2Fplain
 //
 
+void loadAndStoreImage(string filename, string basepath, aiTextureType type) {
+    sf::Image *img = new sf::Image();
+    img->LoadFromFile(filename);
+    textureIdMap[make_pair(basepath, type)] = img;
+}
+
 void LoadGLTextures(const aiScene* scene) {
     assert(!scene->HasTextures());
 
@@ -318,24 +324,18 @@ void LoadGLTextures(const aiScene* scene) {
                 /* Diffuse texture */
                 filename = stringify(BASE_PATH) + stringify(path.data) + stringify("_d.jpg");
 
-                sf::Image *img_diff = new sf::Image();
-                img_diff->LoadFromFile(filename);
-                textureIdMap[make_pair(basepath, aiTextureType_DIFFUSE)] = img_diff;
+                loadAndStoreImage(filename, basepath, aiTextureType_DIFFUSE);
 
                 /* Specular texture */
                 filename = stringify(BASE_PATH) + stringify(path.data) + stringify("_s.jpg");
 
-                sf::Image *img_spec = new sf::Image();
-                img_spec->LoadFromFile(filename);
-                textureIdMap[make_pair(basepath, aiTextureType_SPECULAR)] = img_spec;
+                loadAndStoreImage(filename, basepath, aiTextureType_SPECULAR);
 
                 filename = stringify(BASE_PATH) + stringify(path.data) + stringify("_n.jpg");
 
                 /* Normal texture? */
                 if (fexists(filename.c_str())) {
-                    sf::Image *img_norm = new sf::Image();
-                    img_norm->LoadFromFile(filename);
-                    textureIdMap[make_pair(basepath, aiTextureType_NORMALS)] = img_norm;
+                    loadAndStoreImage(filename, basepath, aiTextureType_NORMALS);
                 }
             }
         }
