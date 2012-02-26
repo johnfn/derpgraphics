@@ -8,6 +8,9 @@
 #include <fstream>
 
 //TODO
+#define DEBUG
+
+//TODO
 #define BASE_PATH "/Users/grantm/class/cs248/assign3/models/"
 #define MODEL_PATH_1 "/Users/grantm/class/cs248/assign3/models/cathedral.3ds"
 #define MODEL_PATH_2 "/Users/grantm/class/cs248/assign3/models/sphere.3ds"
@@ -71,6 +74,26 @@ int main(int argc, char** argv) {
     return 0;
 }
 
+GLenum to_texture_num(string str, aiTextureType type, bool die_if_doesnt_exist = false) {
+    pair<string, aiTextureType> p = make_pair(str, type);
+
+    static map<pair<string, aiTextureType>, GLenum > m;
+
+    if (!m.count(p)) {
+        if (die_if_doesnt_exist) {
+            assert("Couldn't find texture!!!");
+        }
+        GLuint texture;
+
+        // allocate a texture name
+        glGenTextures( 1, &texture );
+        m[p] = texture;
+    }
+
+    cout << m[p] << endl;
+
+    return m[p];
+}
 
 
 void initOpenGL() {
@@ -207,20 +230,13 @@ void handleInput() {
 }
 
 //strType == diffuseMap (for instance.)
-void apply_texture(const aiTextureType type, const GLenum textureNum, const string strType, const string strpath) {
+void apply_texture(const aiTextureType type, const string strType, const string strpath) {
+    GLenum textureNum = to_texture_num(strpath, type);
+
     GLint loc = glGetUniformLocation(shader->programID(), strType.c_str());
     glUniform1i(loc, textureNum); // The diffuse map will be
 
-    switch (textureNum) {
-        case 0: glActiveTexture(GL_TEXTURE0); break;
-        case 1: glActiveTexture(GL_TEXTURE1); break;
-        case 2: glActiveTexture(GL_TEXTURE2); break;
-        default: assert("unsupported texture number"); break;
-    }
     sf::Image *img = textureIdMap[make_pair(strpath, type)];
-
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
     /* With thanks to http://stackoverflow.com/questions/5436487/how-would-i-be-able-to-use-glu-rgba-or-other-glu-parameters */
     //TODO: Far too slow. Preprocess.
@@ -266,16 +282,16 @@ void recursive_render (const struct aiScene *sc, struct aiNode *nd) {
 
             string strpath(texPath.data);
 
-            apply_texture(aiTextureType_DIFFUSE, 0, "diffuseMap", strpath);
+            apply_texture(aiTextureType_DIFFUSE, "diffuseMap", strpath);
 
             /* Specular */
-            apply_texture(aiTextureType_SPECULAR, 1, "specularMap", strpath);
+            apply_texture(aiTextureType_SPECULAR, "specularMap", strpath);
 
             if (textureIdMap.count(make_pair(strpath, aiTextureType_NORMALS)) != 0) {
                 GLint hasNormal = glGetUniformLocation(shader->programID(), "hasNormalMapping");
                 glUniform1i(hasNormal, true);
 
-                apply_texture(aiTextureType_NORMALS, 2, "normalMap", strpath);
+                apply_texture(aiTextureType_NORMALS, "normalMap", strpath);
             }
         }
 
@@ -299,14 +315,31 @@ bool fexists(const char *filename) {
   ifstream ifile(filename);
   return ifile;
 }
+
 //
 //Code borrowed with some modification from http://assimp.svn.sourceforge.net/viewvc/assimp/trunk/samples/SimpleTexturedOpenGL/SimpleTexturedOpenGL/src/model_loading.cpp?revision=1171&content-type=text%2Fplain
 //
-
-void loadAndStoreImage(string filename, string basepath, aiTextureType type) {
+void loadAndStoreImage(string filename, string basepath, aiTextureType type, bool filter = true) {
     sf::Image *img = new sf::Image();
     img->LoadFromFile(filename);
     textureIdMap[make_pair(basepath, type)] = img;
+
+    GLenum texnum = to_texture_num(basepath, type);
+
+    glActiveTexture(texnum); // It seems I need to set *some* active texture, but it doesn't matter which one. (TODO?)
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+    /* With thanks to http://stackoverflow.com/questions/5436487/how-would-i-be-able-to-use-glu-rgba-or-other-glu-parameters */
+    if (filter) {
+        #ifndef DEBUG
+        gluBuild2DMipmaps(GL_TEXTURE_2D, GL_RGBA, img->GetWidth(), img->GetHeight(), GL_RGBA, GL_UNSIGNED_BYTE, img->GetPixelsPtr());
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        #endif
+    }
+
+    img->Bind();
 }
 
 void LoadGLTextures(const aiScene* scene) {
@@ -335,7 +368,7 @@ void LoadGLTextures(const aiScene* scene) {
 
                 /* Normal texture? */
                 if (fexists(filename.c_str())) {
-                    loadAndStoreImage(filename, basepath, aiTextureType_NORMALS);
+                    loadAndStoreImage(filename, basepath, aiTextureType_NORMALS, false);
                 }
             }
         }
@@ -480,7 +513,7 @@ void renderFrame() {
     glLightfv(GL_LIGHT0, GL_DIFFUSE, light_diffuse);
     glLightfv(GL_LIGHT0, GL_SPECULAR, light_specular);
 
-    GLfloat pos[4] = {0.0f, 11.0f, 0.0f, 0.0f};
+    GLfloat pos[4] = {0.0f, 11.0f, 0.0f, 1.0f};
 
     glLightfv(GL_LIGHT0, GL_POSITION, pos);
 
