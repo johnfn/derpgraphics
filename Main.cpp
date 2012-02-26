@@ -78,19 +78,18 @@ GLenum to_texture_num(string str, aiTextureType type, bool die_if_doesnt_exist =
     pair<string, aiTextureType> p = make_pair(str, type);
 
     static map<pair<string, aiTextureType>, GLenum > m;
+    static int highest_so_far = GL_TEXTURE0;
 
     if (!m.count(p)) {
         if (die_if_doesnt_exist) {
             assert("Couldn't find texture!!!");
         }
-        GLuint texture;
 
-        // allocate a texture name
-        glGenTextures( 1, &texture );
-        m[p] = texture;
+        cout << highest_so_far + 1 << endl;
+
+        m[p] = highest_so_far;
+        highest_so_far++;
     }
-
-    cout << m[p] << endl;
 
     return m[p];
 }
@@ -234,7 +233,9 @@ void apply_texture(const aiTextureType type, const string strType, const string 
     GLenum textureNum = to_texture_num(strpath, type);
 
     GLint loc = glGetUniformLocation(shader->programID(), strType.c_str());
-    glUniform1i(loc, textureNum); // The diffuse map will be
+    glUniform1i(loc, textureNum - GL_TEXTURE0); // The diffuse map will be
+
+    glActiveTexture(textureNum);
 
     sf::Image *img = textureIdMap[make_pair(strpath, type)];
 
