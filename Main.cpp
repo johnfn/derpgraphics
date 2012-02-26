@@ -55,25 +55,6 @@ if (GL_NO_ERROR != error) {\
 }\
 }
 
-
-// ----------------------------------------------------------------------------
-void color4_to_float4(const struct aiColor4D *c, float f[4])
-{
-    f[0] = c->r;
-    f[1] = c->g;
-    f[2] = c->b;
-    f[3] = c->a;
-}
-
-// ----------------------------------------------------------------------------
-void set_float4(float f[4], float a, float b, float c, float d)
-{
-    f[0] = a;
-    f[1] = b;
-    f[2] = c;
-    f[3] = d;
-}
-
 int main(int argc, char** argv) {
 
     initOpenGL();
@@ -174,6 +155,8 @@ float dx = 0, dy = 0;
 float x = 0, y = 0;
 float rx = 0, ry = 0, drx = 0, dry = 0;
 
+float mx = 0.0f;
+
 void handleInput() {
     //////////////////////////////////////////////////////////////////////////
     // TODO: ADD YOUR INPUT HANDLING HERE.
@@ -188,6 +171,9 @@ void handleInput() {
                 // Close the window.  This will cause the game loop to exit,
                 // because the IsOpened() function will no longer return true.
                 window.Close();
+                break;
+            case sf::Event::MouseMoved:
+                mx = evt.MouseMove.X * 360.0f / 800.0f;
                 break;
             case sf::Event::KeyPressed:
                 if (evt.Key.Code == sf::Key::W) dy -= .1;
@@ -243,9 +229,6 @@ void recursive_render (const struct aiScene *sc, struct aiNode *nd) {
         // transparency.
 
         //apply_material(mtl);
-        glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT );
-        glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT );
-
         setMaterial(sc, mesh);
 
         if(AI_SUCCESS == mtl->GetTexture(aiTextureType_DIFFUSE, 0 /*texIndex*/, &texPath)) {
@@ -254,15 +237,18 @@ void recursive_render (const struct aiScene *sc, struct aiNode *nd) {
             GLint diffuse = glGetUniformLocation(shader->programID(), "diffuseMap");
             glUniform1i(diffuse, 0); // The diffuse map will be GL_TEXTURE0
             glActiveTexture(GL_TEXTURE0);
+            glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT );
+            glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT );
             textureIdMap[make_pair(strpath, aiTextureType_DIFFUSE)]->Bind();
 
+
             /* Specular */
-            /*
             GLint specular = glGetUniformLocation(shader->programID(), "specularMap");
             glUniform1i(specular, 1); // The diffuse map will be GL_TEXTURE0
             glActiveTexture(GL_TEXTURE1);
+            glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT );
+            glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT );
             textureIdMap[make_pair(strpath, aiTextureType_SPECULAR)]->Bind();
-            */
 
             cout << "asking " << strpath << endl;
             if (textureIdMap.count(make_pair(strpath, aiTextureType_NORMALS)) != 0) {
@@ -324,10 +310,8 @@ void LoadGLTextures(const aiScene* scene) {
 
                 filename = stringify(BASE_PATH) + stringify(path.data) + stringify("_n.jpg");
 
-                cout << filename << " checking " << endl;
                 /* Normal texture? */
                 if (fexists(filename.c_str())) {
-                    cout << "yep!; " << basepath << endl;
                     sf::Image *img_norm = new sf::Image();
                     img_norm->LoadFromFile(filename);
                     textureIdMap[make_pair(basepath, aiTextureType_NORMALS)] = img_norm;
@@ -452,10 +436,19 @@ void renderFrame() {
     gluLookAt(0.0f, 2.0f, -12.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
 
     // Add a little rotation, using the elapsed time for smooth animation
-    static float elapsed = 0.0f;
-    elapsed += clck.GetElapsedTime();
-    clck.Reset();
-    glRotatef(20*elapsed, 0, 1, 0);
+    glRotatef(mx, 0, 1, 0);
+
+    GLfloat light_ambient[] = { 0.0, 0.0, 0.0, 1.0 };
+    GLfloat light_diffuse[] = { 1.0, 1.0, 1.0, 1.0 };
+    GLfloat light_specular[] = { 1.0, 1.0, 1.0, 1.0 };
+
+    glLightfv(GL_LIGHT0, GL_AMBIENT, light_ambient);
+    glLightfv(GL_LIGHT0, GL_DIFFUSE, light_diffuse);
+    glLightfv(GL_LIGHT0, GL_SPECULAR, light_specular);
+
+    GLfloat pos[4] = {0.0f, 11.0f, 0.0f, 0.0f};
+
+    glLightfv(GL_LIGHT0, GL_POSITION, pos);
 
 /*
 
