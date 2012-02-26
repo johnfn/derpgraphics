@@ -9,6 +9,7 @@ uniform vec3 Kd;
 uniform vec3 Ks;
 uniform vec3 Ka;
 uniform float alpha;
+uniform bool hasNormalMapping;
 
 // These are values that OpenGL interpoates for us.  Note that some of these
 // are repeated from the fragment shader.  That's because they're passed
@@ -25,18 +26,18 @@ void main() {
 	vec3 N = normalize(normal);
 	vec3 L = normalize(gl_LightSource[0].position.xyz);
 	vec3 V = normalize(-eyePosition);
-		
+
 	// Calculate the diffuse color coefficient, and sample the diffuse texture
 	float Rd = max(0.0, dot(L, N));
 	vec3 Td = texture2D(diffuseMap, texcoord).rgb;
 	vec3 diffuse = Rd * Kd * Td * gl_LightSource[0].diffuse.rgb;
-	
+
 	// Calculate the specular coefficient
 	vec3 R = reflect(-L, N);
 	float Rs = pow(max(0.0, dot(V, R)), alpha);
 	vec3 Ts = texture2D(specularMap, texcoord).rgb;
 	vec3 specular = Rs * Ks * Ts * gl_LightSource[0].specular.rgb;
-		
+
 	// Ambient is easy
 	vec3 ambient = Ka * gl_LightSource[0].ambient.rgb;
 

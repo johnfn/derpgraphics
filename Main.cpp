@@ -46,7 +46,6 @@ void drawMesh(const struct aiMesh *mesh);
 void setMaterial(const struct aiScene *scene, const struct aiMesh *mesh);
 void setTextures();
 void LoadGLTextures(const aiScene* scene);
-void apply_material(const aiMaterial *mtl);
 
 #define GL_CHECK(x) {\
 (x);\
@@ -250,19 +249,27 @@ void recursive_render (const struct aiScene *sc, struct aiNode *nd) {
         setMaterial(sc, mesh);
 
         if(AI_SUCCESS == mtl->GetTexture(aiTextureType_DIFFUSE, 0 /*texIndex*/, &texPath)) {
+            /* Diffuse */
             string strpath(texPath.data);
             GLint diffuse = glGetUniformLocation(shader->programID(), "diffuseMap");
             glUniform1i(diffuse, 0); // The diffuse map will be GL_TEXTURE0
             glActiveTexture(GL_TEXTURE0);
             textureIdMap[make_pair(strpath, aiTextureType_DIFFUSE)]->Bind();
-        }
 
-        if(AI_SUCCESS == mtl->GetTexture(aiTextureType_SPECULAR, 0 /*texIndex*/, &texPath)) {
-            string strpath(texPath.data);
+            /* Specular */
+            /*
             GLint specular = glGetUniformLocation(shader->programID(), "specularMap");
             glUniform1i(specular, 1); // The diffuse map will be GL_TEXTURE0
             glActiveTexture(GL_TEXTURE1);
             textureIdMap[make_pair(strpath, aiTextureType_SPECULAR)]->Bind();
+            */
+
+            cout << "asking " << strpath << endl;
+            if (textureIdMap.count(make_pair(strpath, aiTextureType_NORMALS)) != 0) {
+                cout << "HEY it was true. " << endl;
+                GLint hasNormal = glGetUniformLocation(shader->programID(), "hasNormalMapping");
+                glUniform1i(hasNormal, true);
+            }
         }
 
         drawMesh(mesh);
@@ -275,6 +282,16 @@ void recursive_render (const struct aiScene *sc, struct aiNode *nd) {
     glPopMatrix();
 }
 
+
+string stringify(const char* s) {
+    string str(s);
+    return str;
+}
+
+bool fexists(const char *filename) {
+  ifstream ifile(filename);
+  return ifile;
+}
 //
 //Code borrowed with some modification from http://assimp.svn.sourceforge.net/viewvc/assimp/trunk/samples/SimpleTexturedOpenGL/SimpleTexturedOpenGL/src/model_loading.cpp?revision=1171&content-type=text%2Fplain
 //
@@ -285,28 +302,36 @@ void LoadGLTextures(const aiScene* scene) {
     //Map each path to a loaded texture file.
     for (unsigned int i = 0; i < scene->mNumMaterials; ++i) {
         for (unsigned int k = 0; k < scene->mMaterials[i]->mNumAllocated; k++) {
-            aiString path1, path2;
+            aiString path;
 
-            if (AI_SUCCESS == scene->mMaterials[i]->GetTexture(aiTextureType_DIFFUSE, k, &path1)) {
-                string strpath(path1.data);
+            if (AI_SUCCESS == scene->mMaterials[i]->GetTexture(aiTextureType_DIFFUSE, k, &path)) {
+                string basepath(path.data);
                 string filename(BASE_PATH);
-                filename += path1.data;
-                filename += "_d.jpg"; //TODO: Dehack.
+
+                /* Diffuse texture */
+                filename = stringify(BASE_PATH) + stringify(path.data) + stringify("_d.jpg");
 
                 sf::Image *img_diff = new sf::Image();
                 img_diff->LoadFromFile(filename);
-                textureIdMap[make_pair(strpath, aiTextureType_DIFFUSE)] = img_diff;
-            }
+                textureIdMap[make_pair(basepath, aiTextureType_DIFFUSE)] = img_diff;
 
-            if (AI_SUCCESS == scene->mMaterials[i]->GetTexture(aiTextureType_SPECULAR, k, &path2)) {
-                string strpath(path2.data);
-                string filename(BASE_PATH);
-                filename += path2.data;
-                filename += "_s.jpg"; //TODO: Dehack.
+                /* Specular texture */
+                filename = stringify(BASE_PATH) + stringify(path.data) + stringify("_s.jpg");
 
                 sf::Image *img_spec = new sf::Image();
                 img_spec->LoadFromFile(filename);
-                textureIdMap[make_pair(strpath, aiTextureType_SPECULAR)] = img_spec;
+                textureIdMap[make_pair(basepath, aiTextureType_SPECULAR)] = img_spec;
+
+                filename = stringify(BASE_PATH) + stringify(path.data) + stringify("_n.jpg");
+
+                cout << filename << " checking " << endl;
+                /* Normal texture? */
+                if (fexists(filename.c_str())) {
+                    cout << "yep!; " << basepath << endl;
+                    sf::Image *img_norm = new sf::Image();
+                    img_norm->LoadFromFile(filename);
+                    textureIdMap[make_pair(basepath, aiTextureType_NORMALS)] = img_norm;
+                }
             }
         }
     }
@@ -326,76 +351,6 @@ void LoadGLTextures(const aiScene* scene) {
         }
     }
     */
-}
-
-void apply_material(const aiMaterial *mtl)
-{
-    float c[4];
-
-    GLenum fill_mode;
-    int ret1, ret2;
-    aiColor4D diffuse;
-    aiColor4D specular;
-    aiColor4D ambient;
-    aiColor4D emission;
-    float shininess, strength;
-    int two_sided;
-    int wireframe;
-    unsigned int max;   // changed: to unsigned
-
-    /*
-    if(AI_SUCCESS == mtl->GetTexture(aiTextureType_DIFFUSE, texIndex, &texPath))
-    {
-        //bind texture
-        unsigned int texId = *textureIdMap[texPath.data];
-        glBindTexture(GL_TEXTURE_2D, texId);
-    }
-    */
-
-    set_float4(c, 0.8f, 0.8f, 0.8f, 1.0f);
-    if(AI_SUCCESS == aiGetMaterialColor(mtl, AI_MATKEY_COLOR_DIFFUSE, &diffuse))
-        color4_to_float4(&diffuse, c);
-    glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, c);
-
-    set_float4(c, 0.0f, 0.0f, 0.0f, 1.0f);
-    if(AI_SUCCESS == aiGetMaterialColor(mtl, AI_MATKEY_COLOR_SPECULAR, &specular))
-        color4_to_float4(&specular, c);
-    glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, c);
-
-    set_float4(c, 0.2f, 0.2f, 0.2f, 1.0f);
-    if(AI_SUCCESS == aiGetMaterialColor(mtl, AI_MATKEY_COLOR_AMBIENT, &ambient))
-        color4_to_float4(&ambient, c);
-    glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, c);
-
-    set_float4(c, 0.0f, 0.0f, 0.0f, 1.0f);
-    if(AI_SUCCESS == aiGetMaterialColor(mtl, AI_MATKEY_COLOR_EMISSIVE, &emission))
-        color4_to_float4(&emission, c);
-    glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION, c);
-
-    max = 1;
-    ret1 = aiGetMaterialFloatArray(mtl, AI_MATKEY_SHININESS, &shininess, &max);
-    max = 1;
-    ret2 = aiGetMaterialFloatArray(mtl, AI_MATKEY_SHININESS_STRENGTH, &strength, &max);
-    if((ret1 == AI_SUCCESS) && (ret2 == AI_SUCCESS))
-        glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, shininess * strength);
-    else {
-        glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, 0.0f);
-        set_float4(c, 0.0f, 0.0f, 0.0f, 0.0f);
-        glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, c);
-    }
-
-    max = 1;
-    if(AI_SUCCESS == aiGetMaterialIntegerArray(mtl, AI_MATKEY_ENABLE_WIREFRAME, &wireframe, &max))
-        fill_mode = wireframe ? GL_LINE : GL_FILL;
-    else
-        fill_mode = GL_FILL;
-    glPolygonMode(GL_FRONT_AND_BACK, fill_mode);
-
-    max = 1;
-    if((AI_SUCCESS == aiGetMaterialIntegerArray(mtl, AI_MATKEY_TWOSIDED, &two_sided, &max)) && two_sided)
-        glEnable(GL_CULL_FACE);
-    else
-        glDisable(GL_CULL_FACE);
 }
 
 void setMaterial(const struct aiScene *scene, const struct aiMesh *mesh) {

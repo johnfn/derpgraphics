@@ -5,10 +5,15 @@ attribute vec3 positionIn;
 attribute vec2 texcoordIn;
 attribute vec3 normalIn;
 
+//attribute vec3 tangentIn;
+//attribute vec3 bitangentIn;
+
 // These are the "output" values of our shader.  OpenGL will interpolate
 // these for us (good riddance project 2!)
 varying vec2 texcoord;
 varying vec3 normal;
+//varying vec3 tangent;
+//varying vec3 bitangent;
 varying vec3 eyePosition;
 
 void main() {
@@ -23,6 +28,8 @@ void main() {
 
 	// Transform the normal, just like in Assignment 2.
 	normal = gl_NormalMatrix * normalIn;
+
+	//tangent =
 
 	// Just copy the texture coordinates
 	texcoord = texcoordIn;
