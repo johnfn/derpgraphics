@@ -237,8 +237,8 @@ void recursive_render (const struct aiScene *sc, struct aiNode *nd) {
             GLint diffuse = glGetUniformLocation(shader->programID(), "diffuseMap");
             glUniform1i(diffuse, 0); // The diffuse map will be GL_TEXTURE0
             glActiveTexture(GL_TEXTURE0);
-            glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT );
-            glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT );
+            glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+            glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
             textureIdMap[make_pair(strpath, aiTextureType_DIFFUSE)]->Bind();
 
 
@@ -250,11 +250,17 @@ void recursive_render (const struct aiScene *sc, struct aiNode *nd) {
             glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT );
             textureIdMap[make_pair(strpath, aiTextureType_SPECULAR)]->Bind();
 
-            cout << "asking " << strpath << endl;
             if (textureIdMap.count(make_pair(strpath, aiTextureType_NORMALS)) != 0) {
-                cout << "HEY it was true. " << endl;
                 GLint hasNormal = glGetUniformLocation(shader->programID(), "hasNormalMapping");
                 glUniform1i(hasNormal, true);
+
+                GLint specular = glGetUniformLocation(shader->programID(), "normalMap");
+                glUniform1i(specular, 2);
+                glActiveTexture(GL_TEXTURE2);
+                glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+                glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+                textureIdMap[make_pair(strpath, aiTextureType_NORMALS)]->Bind();
+
             }
         }
 
@@ -409,6 +415,16 @@ void drawMesh(const struct aiMesh *mesh) {
     glEnableVertexAttribArray(normal);
     glVertexAttribPointer(normal, 3, GL_FLOAT, 0, sizeof(aiVector3D), mesh->mNormals);
 
+    //Tangent
+    GLint tangent = glGetAttribLocation(shader->programID(), "tangentIn");
+    glEnableVertexAttribArray(tangent);
+    glVertexAttribPointer(tangent, 3, GL_FLOAT, 0, sizeof(aiVector3D), mesh->mTangents);
+
+    //Bitangent
+    GLint biTangent = glGetAttribLocation(shader->programID(), "biTangentIn");
+    glEnableVertexAttribArray(biTangent);
+    glVertexAttribPointer(biTangent, 3, GL_FLOAT, 0, sizeof(aiVector3D), mesh->mBitangents);
+
     glDrawElements(GL_TRIANGLES, 3 * mesh->mNumFaces, GL_UNSIGNED_INT, &indexBuffer[0]);
 }
 
@@ -438,7 +454,7 @@ void renderFrame() {
     // Add a little rotation, using the elapsed time for smooth animation
     glRotatef(mx, 0, 1, 0);
 
-    GLfloat light_ambient[] = { 0.0, 0.0, 0.0, 1.0 };
+    GLfloat light_ambient[] = { 0.2, 0.2, 0.2, 1.0 };
     GLfloat light_diffuse[] = { 1.0, 1.0, 1.0, 1.0 };
     GLfloat light_specular[] = { 1.0, 1.0, 1.0, 1.0 };
 
