@@ -1,3 +1,4 @@
+#version 120
 
 // These are the "input" to our shader.  They are read from the vertex
 // arrays that we specified in the C++ code.

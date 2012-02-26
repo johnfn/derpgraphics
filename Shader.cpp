@@ -4,7 +4,7 @@
  *  Created by Matthew Fichman on 1/25/11.
  *
  *  NOTE: Students should not need to modify this file.
- *  
+ *
  */
 
 #include "Shader.h"
@@ -21,7 +21,7 @@ Shader::Shader(const std::string& path) :
 
 	const GLchar* source[1];
     int length = 0;
-	
+
 	// Load the fragment shader and compile
 	std::vector<char> fragmentSource = readSource(path + ".frag.glsl");
 	source[0] = &fragmentSource.front();
@@ -29,7 +29,7 @@ Shader::Shader(const std::string& path) :
 	fragmentShaderID_ = glCreateShader(GL_FRAGMENT_SHADER);
     glShaderSource(fragmentShaderID_, 1, source, &length);
     glCompileShader(fragmentShaderID_);
-		
+
 	// Load the vertex shader and compile
 	std::vector<char> vertexSource = readSource(path + ".vert.glsl");
 	source[0] = &vertexSource.front();
@@ -37,13 +37,13 @@ Shader::Shader(const std::string& path) :
 	vertexShaderID_ = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(vertexShaderID_, 1, source, &length);
     glCompileShader(vertexShaderID_);
-	
+
 	// Create the vertex program
 	programID_ = glCreateProgram();
 	glAttachShader(programID_, fragmentShaderID_);
 	glAttachShader(programID_, vertexShaderID_);
 	glLinkProgram(programID_);
-	
+
 	// Error checking
 	glGetProgramiv(programID_, GL_LINK_STATUS, (GLint*)&loaded_);
     //glGetShaderiv(vertexShaderID_, GL_COMPILE_STATUS, (GLint*)&loaded_);
@@ -59,6 +59,8 @@ Shader::Shader(const std::string& path) :
 		glGetProgramInfoLog(programID_, ERROR_BUFSIZE, &length, tempErrorLog);
         errors_ += "Linker errors:\n";
 		errors_ += std::string(tempErrorLog, length) + "\n";
+
+        std::cerr << errors_ << std::endl;
     }
 }
 
@@ -77,7 +79,7 @@ std::vector<char> Shader::readSource(const std::string& path) {
 		source.push_back(0);
 		return source;
 	}
-	
+
 	// Seek to the end of the file to get the size
 	in.seekg(0, std::ios::end);
 	source.reserve((unsigned)(1 + in.tellg()));
@@ -87,12 +89,12 @@ std::vector<char> Shader::readSource(const std::string& path) {
 		source.push_back(0);
 		return source;
 	}
-	
-	// Now read the whole buffer in one call, and don't 
+
+	// Now read the whole buffer in one call, and don't
 	// forget to null-terminate the vector with a zero
 	in.read(&source.front(), source.size());
 	source.push_back(0);
-	
+
 	return source;
 }
 

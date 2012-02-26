@@ -9,7 +9,8 @@
 
 //TODO
 #define BASE_PATH "/Users/grantm/class/cs248/assign3/models/"
-#define MODEL_PATH "/Users/grantm/class/cs248/assign3/models/cathedral.3ds"
+#define MODEL_PATH_1 "/Users/grantm/class/cs248/assign3/models/cathedral.3ds"
+#define MODEL_PATH_2 "/Users/grantm/class/cs248/assign3/models/sphere.3ds"
 #define SPEC_SUFFIX "_s.jpg"
 #define NORM_SUFFIX "_n.jpg"
 #define DIFF_SUFFIX "_d.jpg"
@@ -123,8 +124,11 @@ asset loadAsset(const char* name) {
 }
 
 void loadAssets() {
-    asset a = loadAsset(MODEL_PATH);
-    assets.push_back(a);
+    asset cathedral = loadAsset(MODEL_PATH_1);
+    assets.push_back(cathedral);
+
+    // asset sphere = loadAsset(MODEL_PATH_2);
+    // assets.push_back(sphere);
 
     // Read in an asset file, and do some post-processing.  There is much
     // more you can do with this asset loader, including load textures.
@@ -156,6 +160,7 @@ float x = 0, y = 0;
 float rx = 0, ry = 0, drx = 0, dry = 0;
 
 float mx = 0.0f;
+float my = 0.0f;
 
 void handleInput() {
     //////////////////////////////////////////////////////////////////////////
@@ -174,8 +179,9 @@ void handleInput() {
                 break;
             case sf::Event::MouseMoved:
                 mx = evt.MouseMove.X * 360.0f / 800.0f;
+                my = evt.MouseMove.Y * 360.0f / 800.0f;
                 break;
-            case sf::Event::KeyPressed:
+            /*case sf::Event::KeyPressed:
                 if (evt.Key.Code == sf::Key::W) dy -= .1;
                 if (evt.Key.Code == sf::Key::S) dy += .1;
 
@@ -193,13 +199,27 @@ void handleInput() {
                 // If the window is resized, then we need to change the perspective
                 // transformation and viewport
                 glViewport(0, 0, evt.Size.Width, evt.Size.Height);
-                break;
+                break;*/
             default:
                 break;
         }
     }
 }
 
+//strType == diffuseMap (for instance.)
+void apply_texture(aiTextureType type, GLenum textureNum, string strType, string strpath) {
+    GLint loc = glGetUniformLocation(shader->programID(), strType.c_str());
+    glUniform1i(loc, textureNum); // The diffuse map will be GL_TEXTURE0
+
+    glActiveTexture(textureNum);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    int w = textureIdMap[make_pair(strpath, type)]->GetWidth();
+    int h = textureIdMap[make_pair(strpath, type)]->GetHeight();
+    //gluBuild2DMipmaps(GL_TEXTURE_2D, GL_RGBA, GLsizei width, GLsizei height, GLenum format, GLenum type, const void *data)
+
+    textureIdMap[make_pair(strpath, type)]->Bind();
+}
 
 void recursive_render (const struct aiScene *sc, struct aiNode *nd) {
     struct aiMatrix4x4 m = nd->mTransformation;
@@ -233,34 +253,19 @@ void recursive_render (const struct aiScene *sc, struct aiNode *nd) {
 
         if(AI_SUCCESS == mtl->GetTexture(aiTextureType_DIFFUSE, 0 /*texIndex*/, &texPath)) {
             /* Diffuse */
-            string strpath(texPath.data);
-            GLint diffuse = glGetUniformLocation(shader->programID(), "diffuseMap");
-            glUniform1i(diffuse, 0); // The diffuse map will be GL_TEXTURE0
-            glActiveTexture(GL_TEXTURE0);
-            glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-            glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-            textureIdMap[make_pair(strpath, aiTextureType_DIFFUSE)]->Bind();
 
+            string strpath(texPath.data);
+
+            apply_texture(aiTextureType_DIFFUSE, 0, "diffuseMap", strpath);
 
             /* Specular */
-            GLint specular = glGetUniformLocation(shader->programID(), "specularMap");
-            glUniform1i(specular, 1); // The diffuse map will be GL_TEXTURE0
-            glActiveTexture(GL_TEXTURE1);
-            glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT );
-            glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT );
-            textureIdMap[make_pair(strpath, aiTextureType_SPECULAR)]->Bind();
+            apply_texture(aiTextureType_DIFFUSE, 1, "specularMap", strpath);
 
             if (textureIdMap.count(make_pair(strpath, aiTextureType_NORMALS)) != 0) {
                 GLint hasNormal = glGetUniformLocation(shader->programID(), "hasNormalMapping");
                 glUniform1i(hasNormal, true);
 
-                GLint specular = glGetUniformLocation(shader->programID(), "normalMap");
-                glUniform1i(specular, 2);
-                glActiveTexture(GL_TEXTURE2);
-                glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-                glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-                textureIdMap[make_pair(strpath, aiTextureType_NORMALS)]->Bind();
-
+                apply_texture(aiTextureType_DIFFUSE, 2, "normalMap", strpath);
             }
         }
 
@@ -453,6 +458,7 @@ void renderFrame() {
 
     // Add a little rotation, using the elapsed time for smooth animation
     glRotatef(mx, 0, 1, 0);
+    glRotatef(my, 0, 0, 1);
 
     GLfloat light_ambient[] = { 0.2, 0.2, 0.2, 1.0 };
     GLfloat light_diffuse[] = { 1.0, 1.0, 1.0, 1.0 };

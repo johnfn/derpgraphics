@@ -1,9 +1,11 @@
+#version 120
+
 // This is a texture sampler.  It lets you sample textures!  The keyword
 // "uniform" means constant - sort of.  The uniform variables are the same
 // for all fragments in an object, but they can change in between objects.
 uniform sampler2D diffuseMap;
 uniform sampler2D specularMap;
-uniform sampled2D normalMap;
+uniform sampler2D normalMap;
 
 // Diffuse, ambient, and specular materials.  These are also uniform.
 uniform vec3 Kd;
@@ -31,15 +33,17 @@ void main() {
 
 	if (hasNormalMapping) {
 		mat3 normalMatrix = mat3(tangent, bitangent, normal);
+		normalMatrix = transpose(normalMatrix);
 
-		/* Sample the normal */
+		// Sample the normal
 		N = texture2D(normalMap, texcoord).rgb;
 
-		/* Decompress the normal */
+		// Decompress the normal
 		N = N * vec3(2.0, 2.0, 2.0) - vec3(1.0, 1.0, 1.0);
 
-		/* Calculate the normal */
-		N = normalMatrix * gl_NormalMatrix * N;
+		// Calculate the normal
+		N = normalMatrix * N;
+		N = gl_NormalMatrix * N;
 	}
 
 	vec3 L = normalize(gl_LightSource[0].position.xyz);
