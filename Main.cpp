@@ -186,53 +186,38 @@ void createEnvironmentMap(asset *a, asset *scene) {
     // glFramebufferTextureARB(GL_FRAMEBUFFER_EXT, GL_DEPTH_ATTACHMENT_EXT, tDepthCubeMap, 0);
     // glFramebufferTexture2D(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, face, 0, 1); //TODO 1 totally bogus
 
+    //TODO: Some sort of bizarre shader thing?????
+
+    GLfloat aspectRatio = (GLfloat)window.GetWidth()/window.GetHeight();
+    GLfloat nearClip = 0.1f;
+    GLfloat farClip = 500.0f;
+    GLfloat fieldOfView = 45.0f; // Degrees
+
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    gluPerspective(fieldOfView, aspectRatio, nearClip, farClip);
+
     /* Now render all 6 faces */
 
     GLfloat distance = 5.0f;
     glMatrixMode(GL_PROJECTION);
 
-    /* Positive X */
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glLoadIdentity();
-    gluLookAt(center[0], center[1], center[2], center[0] + distance, center[1], center[2], 0.0f, 1.0f, 0.0f);
-    renderFrame(false);
-    glCopyTexSubImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X, 0, 0, 0, 0, 0, SIZE, SIZE);
+    float deltas[6][3]  = { { 1.0f, 0.0f, 0.0f}
+                          , {-1.0f, 0.0f, 0.0f}
+                          , { 0.0f, 1.0f, 0.0f}
+                          , { 0.0f,-1.0f, 0.0f}
+                          , { 0.0f, 0.0f, 1.0f}
+                          , { 0.0f, 0.0f,-1.0f}
+                          , };
 
-    /* Negative X */
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glLoadIdentity();
-    gluLookAt(center[0], center[1], center[2], center[0] - distance, center[1], center[2], 0.0f, 1.0f, 0.0f);
-    renderFrame(false);
-    glCopyTexSubImage2D(GL_TEXTURE_CUBE_MAP_NEGATIVE_X, 0, 0, 0, 0, 0, SIZE, SIZE);
-
-    /* Positive Y */
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glLoadIdentity();
-    gluLookAt(center[0], center[1], center[2], center[0], center[1] + distance, center[2], 0.0f, 1.0f, 0.0f);
-    renderFrame(false);
-    glCopyTexSubImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_Y, 0, 0, 0, 0, 0, SIZE, SIZE);
-
-    /* Negative Y */
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glLoadIdentity();
-    gluLookAt(center[0], center[1], center[2], center[0], center[1] - distance, center[2], 0.0f, 1.0f, 0.0f);
-    renderFrame(false);
-    glCopyTexSubImage2D(GL_TEXTURE_CUBE_MAP_NEGATIVE_Y, 0, 0, 0, 0, 0, SIZE, SIZE);
-
-    /* Positive Z */
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glLoadIdentity();
-    gluLookAt(center[0], center[1], center[2], center[0], center[1], center[2] + distance, 0.0f, 1.0f, 0.0f);
-    renderFrame(false);
-    glCopyTexSubImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_Z, 0, 0, 0, 0, 0, SIZE, SIZE);
-
-    /* Negative Z */
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glLoadIdentity();
-    gluLookAt(center[0], center[1], center[2], center[0], center[1], center[2] - distance, 0.0f, 1.0f, 0.0f);
-    renderFrame(false);
-    glCopyTexSubImage2D(GL_TEXTURE_CUBE_MAP_NEGATIVE_Z, 0, 0, 0, 0, 0, SIZE, SIZE);
-
+    for (int i = 0; i < 6; ++i) {
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glLoadIdentity();
+        gluLookAt(center[0], center[1], center[2], center[0] + deltas[i][0], center[1] + deltas[i][1], center[2] + deltas[i][2], 0.0f, 1.0f, 0.0f);
+        renderFrame(false);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, face);
+        glCopyTexSubImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, 0, 0, 0, 0, SIZE, SIZE);
+    }
 
     sf::Image img(SIZE, SIZE, sf::Color::White);
     GLubyte *data = new GLubyte[SIZE * SIZE * 4];
