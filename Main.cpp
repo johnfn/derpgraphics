@@ -27,6 +27,7 @@ using namespace std;
 sf::WindowSettings settings(24, 8, 2);
 sf::Window window(sf::VideoMode(800, 600), "CS248 Rules!", sf::Style::Close, settings);
 
+void recursive_render (const struct aiScene *sc, struct aiNode *nd);
 std::map<pair<string, aiTextureType>, sf::Image*> textureIdMap; //TODO: Not an ID map any more.
 
 // This is a clock you can use to control animation.  For more info, see:
@@ -47,7 +48,7 @@ Assimp::Importer importers[2];
 void initOpenGL();
 void loadAssets();
 void handleInput();
-void renderFrame();
+void renderFrame(bool resetCam=true);
 void drawMesh(const struct aiMesh *mesh);
 void setMaterial(const struct aiScene *scene, const struct aiMesh *mesh);
 void setTextures();
@@ -121,8 +122,9 @@ void initOpenGL() {
 
 struct asset {
     const aiScene* scene;
-    sf::Image diff_texture;
-    sf::Image spec_texture;
+    bool hasEnvMap;
+
+    asset() : hasEnvMap(false) {};
 };
 
 vector<asset> assets;
@@ -147,6 +149,100 @@ asset loadAsset(const char* name, int imp) {
     return a;
 }
 
+// a is the object that has the environment map
+// scene is the object that the environment map is made from.
+void createEnvironmentMap(asset *a, asset *scene) {
+    a->hasEnvMap = true;
+    GLuint face;
+    GLuint fbuffer;
+    int SIZE = 64;
+
+    GLfloat center[3] = {0.0f, 3.0f, 0.0f};
+    GLfloat distance = 5.0f;
+
+    glGenTextures(1, &face);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, face);
+    for (int i = 0; i < 6; ++i) {
+        glTexParameterf(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameterf(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameterf(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameterf(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameterf(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    }
+    for (uint i = 0; i < 6; i++) {
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGBA, SIZE, SIZE, 0, GL_RGBA, GL_FLOAT, NULL);
+    }
+
+    /* Set up frame buffer */
+    glGenFramebuffersEXT(1, &fbuffer);
+    glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fbuffer);
+    for (int i = 0; i < 6; ++i) {
+        glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, face, 0);
+        //glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_DEPTH_ATTACHMENT_EXT, GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, <cubeMapDepthTextureId>, 0);
+
+    }
+    // glFramebufferTextureARB(GL_FRAMEBUFFER_EXT, GL_DEPTH_ATTACHMENT_EXT, tDepthCubeMap, 0);
+    // glFramebufferTexture2D(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, face, 0, 1); //TODO 1 totally bogus
+
+    /* Now render all 6 faces */
+
+    glMatrixMode(GL_PROJECTION);
+
+    /* Positive X */
+    glLoadIdentity();
+    gluLookAt(center[0], center[1], center[2], center[0] + distance, center[1], center[2], 0.0f, 1.0f, 0.0f);
+    renderFrame(false);
+    glCopyTexSubImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X, 0, 0, 0, 0, 0, SIZE, SIZE);
+
+    /* Negative X */
+    glLoadIdentity();
+    gluLookAt(center[0], center[1], center[2], center[0] - distance, center[1], center[2], 0.0f, 1.0f, 0.0f);
+    renderFrame(false);
+    glCopyTexSubImage2D(GL_TEXTURE_CUBE_MAP_NEGATIVE_X, 0, 0, 0, 0, 0, SIZE, SIZE);
+
+    /* Positive Y */
+    glLoadIdentity();
+    gluLookAt(center[0], center[1], center[2], center[0], center[1] + distance, center[2], 0.0f, 1.0f, 0.0f);
+    renderFrame(false);
+    glCopyTexSubImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_Y, 0, 0, 0, 0, 0, SIZE, SIZE);
+
+    /* Negative Y */
+    glLoadIdentity();
+    gluLookAt(center[0], center[1], center[2], center[0], center[1] - distance, center[2], 0.0f, 1.0f, 0.0f);
+    renderFrame(false);
+    glCopyTexSubImage2D(GL_TEXTURE_CUBE_MAP_NEGATIVE_Y, 0, 0, 0, 0, 0, SIZE, SIZE);
+
+    /* Positive Z */
+    glLoadIdentity();
+    gluLookAt(center[0], center[1], center[2], center[0], center[1], center[2] + distance, 0.0f, 1.0f, 0.0f);
+    renderFrame(false);
+    glCopyTexSubImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_Z, 0, 0, 0, 0, 0, SIZE, SIZE);
+
+    /* Negative Z */
+    glLoadIdentity();
+    gluLookAt(center[0], center[1], center[2], center[0], center[1], center[2] - distance, 0.0f, 1.0f, 0.0f);
+    renderFrame(false);
+    glCopyTexSubImage2D(GL_TEXTURE_CUBE_MAP_NEGATIVE_Z, 0, 0, 0, 0, 0, SIZE, SIZE);
+
+
+    sf::Image img(SIZE, SIZE, sf::Color::White);
+    GLubyte *data = new GLubyte[SIZE * SIZE * 4];
+    glReadPixels(0, 0, SIZE, SIZE, GL_RGBA, GL_UNSIGNED_BYTE, data);
+    img.LoadFromPixels(SIZE, SIZE, data);
+    img.SaveToFile("derp.jpg");
+
+
+
+
+    // glDrawBuffer(GL_COLOR_ATTACHMENT0_EXT);
+    // glDrawBuffer(GL_NONE);
+
+
+
+    //This seems to come when we actually render the texture.
+    //glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X, 0, GL_RGBA, 128, 128, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
+}
+
 void loadAssets() {
     //asset cathedral = loadAsset(MODEL_PATH_CATH);
     //assets.push_back(cathedral);
@@ -156,6 +252,9 @@ void loadAssets() {
 
     asset c = loadAsset(MODEL_PATH_CATH, 1);
     assets.push_back(c);
+
+    //ENV TODO
+    //createEnvironmentMap(&a, &c);
 
     //asset sphere = loadAsset(MODEL_PATH_2);
     //assets.push_back(sphere);
@@ -414,7 +513,7 @@ void setMaterial(const struct aiScene *scene, const struct aiMesh *mesh) {
     if (AI_SUCCESS == material->Get(AI_MATKEY_SHININESS, value)) {
         glUniform1f(shininess, value);
     } else {
-        glUniform1f(shininess, 1);
+        glUniform1f(shininess, 40);
     }
 }
 
@@ -457,11 +556,13 @@ void drawMesh(const struct aiMesh *mesh) {
 }
 
 
-void renderFrame() {
+void renderFrame(bool resetCam) {
     //////////////////////////////////////////////////////////////////////////
     // TODO: ADD YOUR RENDERING CODE HERE.  You may use as many .cpp files
     // in this assignment as you wish.
     //////////////////////////////////////////////////////////////////////////
+
+    GLfloat center[3] = {0.0f, 3.0f, 0.0f};
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -476,14 +577,17 @@ void renderFrame() {
     glLoadIdentity();
     gluPerspective(fieldOfView, aspectRatio, nearClip, farClip);
 
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
-    gluLookAt(0.0f, 2.0f, -12.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+    if (resetCam) {
+        glMatrixMode(GL_MODELVIEW);
+        glLoadIdentity();
+        gluLookAt(0.0f, 2.0f, -12.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+        // Add a little rotation, using the elapsed time for smooth animation
 
-    // Add a little rotation, using the elapsed time for smooth animation
+        glRotatef(mx, 0, 1, 0);
+        glRotatef(my, 0, 0, 1);
+    }
 
-    glRotatef(mx, 0, 1, 0);
-    glRotatef(my, 0, 0, 1);
+    //glTranslatef(0.0f, -3.0, 0.0);
 
     glEnable(GL_LIGHTING);
     /*
