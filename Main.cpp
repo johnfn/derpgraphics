@@ -63,6 +63,11 @@ if (GL_NO_ERROR != error) {\
 }\
 }
 
+string stringify(const char* s) {
+    string str(s);
+    return str;
+}
+
 int main(int argc, char** argv) {
 
     initOpenGL();
@@ -143,8 +148,6 @@ asset loadAsset(const char* name, int imp) {
         std::cerr << importers[imp].GetErrorString() << std::endl;
         exit(-1);
     }
-
-    cout << "GO" << endl;
     LoadGLTextures(a.scene);
 
     return a;
@@ -156,7 +159,7 @@ void createEnvironmentMap(asset *a, asset *scene) {
     a->hasEnvMap = true;
     int SIZE = 64;
 
-    GLfloat center[3] = {0.0f, 3.0f, 0.0f};
+    GLfloat center[3] = {0.0f, 0.0f, -3.0f};
 
     /* Set up texture */
     GLuint face;
@@ -193,14 +196,13 @@ void createEnvironmentMap(asset *a, asset *scene) {
     GLfloat farClip = 500.0f;
     GLfloat fieldOfView = 45.0f; // Degrees
 
-    glMatrixMode(GL_PROJECTION);
+    glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
     gluPerspective(fieldOfView, aspectRatio, nearClip, farClip);
 
     /* Now render all 6 faces */
 
-    GLfloat distance = 5.0f;
-    glMatrixMode(GL_PROJECTION);
+    GLfloat distance = 100.0f;
 
     float deltas[6][3]  = { { 1.0f, 0.0f, 0.0f}
                           , {-1.0f, 0.0f, 0.0f}
@@ -210,23 +212,35 @@ void createEnvironmentMap(asset *a, asset *scene) {
                           , { 0.0f, 0.0f,-1.0f}
                           , };
 
+    glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0); //TODO
+
     for (int i = 0; i < 6; ++i) {
+        glMatrixMode(GL_MODELVIEW);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glLoadIdentity();
-        gluLookAt(center[0], center[1], center[2], center[0] + deltas[i][0], center[1] + deltas[i][1], center[2] + deltas[i][2], 0.0f, 1.0f, 0.0f);
+        cout << center[0] << " " << center[1] << " " << center[2] << " " << center[0] + deltas[i][0] * distance << " " << center[1] + deltas[i][1] * distance << " " << center[2] + deltas[i][2] * distance << " " << 0.0f << " " << 1.0f << " " << 0.0f << " " << endl;
+
+        gluLookAt(center[0], center[1], center[2], center[0] + deltas[i][0] * distance, center[1] + deltas[i][1] * distance, center[2] + deltas[i][2] * distance, 0.0f, 1.0f, 0.0f);
         renderFrame(false);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, face);
-        glCopyTexSubImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, 0, 0, 0, 0, SIZE, SIZE);
+        //glBindTexture(GL_TEXTURE_CUBE_MAP, face);
+        //glCopyTexSubImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, 0, 0, 0, 0, SIZE, SIZE);
+
+        string out = FILEPATH "derp";
+        out += (i + '0');
+        out += ".jpg";
+
+        sf::Image img(SIZE, SIZE, sf::Color::White);
+        GLubyte *data = new GLubyte[SIZE * SIZE * 4];
+        glReadPixels(0, 0, SIZE, SIZE, GL_RGBA, GL_UNSIGNED_BYTE, data);
+        img.LoadFromPixels(SIZE, SIZE, data);
+        img.SaveToFile(out);
     }
 
-    sf::Image img(SIZE, SIZE, sf::Color::White);
-    GLubyte *data = new GLubyte[SIZE * SIZE * 4];
-    glReadPixels(0, 0, SIZE, SIZE, GL_RGBA, GL_UNSIGNED_BYTE, data);
-    img.LoadFromPixels(SIZE, SIZE, data);
-    img.SaveToFile(FILEPATH "derp.jpg");
+
+    //exit(0);
 
 
-    glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
+
 
 
     // glDrawBuffer(GL_COLOR_ATTACHMENT0_EXT);
@@ -282,8 +296,8 @@ float dx = 0, dy = 0;
 float x = 0, y = 0;
 float rx = 0, ry = 0, drx = 0, dry = 0;
 
-float mx = 0.0f;
-float my = 0.0f;
+float mx = 200.0 * 360.0f / 800.0f;
+float my = 200.0 * 360.0f / 800.0f;
 
 void handleInput() {
     //////////////////////////////////////////////////////////////////////////
@@ -416,11 +430,6 @@ void recursive_render (const struct aiScene *sc, struct aiNode *nd) {
     glPopMatrix();
 }
 
-
-string stringify(const char* s) {
-    string str(s);
-    return str;
-}
 
 bool fexists(const char *filename) {
   ifstream ifile(filename);
@@ -556,8 +565,6 @@ void renderFrame(bool resetCam) {
     // in this assignment as you wish.
     //////////////////////////////////////////////////////////////////////////
 
-    GLfloat center[3] = {0.0f, 3.0f, 0.0f};
-
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     glUseProgram(shader->programID());
@@ -571,10 +578,11 @@ void renderFrame(bool resetCam) {
     glLoadIdentity();
     gluPerspective(fieldOfView, aspectRatio, nearClip, farClip);
 
+    glMatrixMode(GL_MODELVIEW);
     if (resetCam) {
-        glMatrixMode(GL_MODELVIEW);
         glLoadIdentity();
-        gluLookAt(0.0f, 2.0f, -12.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+        //gluLookAt(0.0f, 2.0f, -12.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+        gluLookAt(0.0f, 0.0f, -3.0f, 0.0f, 100.0f, -3.0f, 0.0f, 1.0f, 0.0f);
         // Add a little rotation, using the elapsed time for smooth animation
 
         glRotatef(mx, 0, 1, 0);
