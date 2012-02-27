@@ -30,6 +30,7 @@ sf::Window window(sf::VideoMode(800, 600), "CS248 Rules!", sf::Style::Close, set
 
 void recursive_render (const struct aiScene *sc, struct aiNode *nd);
 std::map<pair<string, aiTextureType>, sf::Image*> textureIdMap; //TODO: Not an ID map any more.
+void setupLight();
 
 // This is a clock you can use to control animation.  For more info, see:
 // http://www.sfml-dev.org/tutorials/1.6/window-time.php
@@ -159,7 +160,7 @@ void createEnvironmentMap(asset *a, asset *scene) {
     a->hasEnvMap = true;
     int SIZE = 64;
 
-    GLfloat center[3] = {0.0f, 0.0f, -3.0f};
+    GLfloat center[3] = {0.0f, 2.0f, 0.0f};
 
     /* Set up texture */
     GLuint face;
@@ -191,18 +192,7 @@ void createEnvironmentMap(asset *a, asset *scene) {
 
     //TODO: Some sort of bizarre shader thing?????
 
-    GLfloat aspectRatio = (GLfloat)window.GetWidth()/window.GetHeight();
-    GLfloat nearClip = 0.1f;
-    GLfloat farClip = 500.0f;
-    GLfloat fieldOfView = 45.0f; // Degrees
-
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
-    gluPerspective(fieldOfView, aspectRatio, nearClip, farClip);
-
     /* Now render all 6 faces */
-
-    GLfloat distance = 100.0f;
 
     float deltas[6][3]  = { { 1.0f, 0.0f, 0.0f}
                           , {-1.0f, 0.0f, 0.0f}
@@ -212,16 +202,35 @@ void createEnvironmentMap(asset *a, asset *scene) {
                           , { 0.0f, 0.0f,-1.0f}
                           , };
 
+    float uppos [6][3]  = { { 0.0f, 1.0f, 0.0f}
+                          , { 0.0f, 1.0f, 0.0f}
+                          , { 1.0f, 0.0f, 0.0f}
+                          , {-1.0f, 0.0f, 0.0f}
+                          , { 0.0f, 1.0f, 0.0f}
+                          , { 0.0f, 1.0f, 0.0f}
+                          , };
+
+
     glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0); //TODO
 
     for (int i = 0; i < 6; ++i) {
-        glMatrixMode(GL_MODELVIEW);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        glLoadIdentity();
-        cout << center[0] << " " << center[1] << " " << center[2] << " " << center[0] + deltas[i][0] * distance << " " << center[1] + deltas[i][1] * distance << " " << center[2] + deltas[i][2] * distance << " " << 0.0f << " " << 1.0f << " " << 0.0f << " " << endl;
 
-        gluLookAt(center[0], center[1], center[2], center[0] + deltas[i][0] * distance, center[1] + deltas[i][1] * distance, center[2] + deltas[i][2] * distance, 0.0f, 1.0f, 0.0f);
-        renderFrame(false);
+        glUseProgram(shader->programID());
+
+        glMatrixMode(GL_PROJECTION);
+        glLoadIdentity();
+        gluPerspective(90.0, 1.0f, 0.1f, 500.0f);
+
+        glMatrixMode(GL_MODELVIEW);
+        glLoadIdentity();
+
+        gluLookAt(center[0],                center[1],                center[2],
+                  center[0] + deltas[i][0], center[1] + deltas[i][1], center[2] + deltas[i][2],
+                  uppos[i][0]             , uppos[i][1]             , uppos[i][2]             );
+
+        setupLight();
+        recursive_render(scene->scene, scene->scene->mRootNode);
         //glBindTexture(GL_TEXTURE_CUBE_MAP, face);
         //glCopyTexSubImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, 0, 0, 0, 0, SIZE, SIZE);
 
@@ -558,12 +567,28 @@ void drawMesh(const struct aiMesh *mesh) {
     glDrawElements(GL_TRIANGLES, 3 * mesh->mNumFaces, GL_UNSIGNED_INT, &indexBuffer[0]);
 }
 
+void setupLight() {
+    glEnable(GL_LIGHTING);
+    GLfloat light_ambient[] = { 0.1, 0.1, 0.1, 1.0 };
+    GLfloat light_diffuse[] = { 1.0, 1.0, 1.0, 1.0 };
+    GLfloat light_specular[] = { 1.0, 1.0, 1.0, 1.0 };
+
+    glLightfv(GL_LIGHT0, GL_AMBIENT, light_ambient);
+    glLightfv(GL_LIGHT0, GL_DIFFUSE, light_diffuse);
+    glLightfv(GL_LIGHT0, GL_SPECULAR, light_specular);
+
+    GLfloat pos[4] = {0.0f, 11.0f, 0.0f, 1.0f};
+
+    glLightfv(GL_LIGHT0, GL_POSITION, pos);
+}
 
 void renderFrame(bool resetCam) {
     //////////////////////////////////////////////////////////////////////////
     // TODO: ADD YOUR RENDERING CODE HERE.  You may use as many .cpp files
     // in this assignment as you wish.
     //////////////////////////////////////////////////////////////////////////
+
+    GLfloat center[3] = {0.0f, 2.0f, 0.0f};
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -576,13 +601,15 @@ void renderFrame(bool resetCam) {
 
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    gluPerspective(fieldOfView, aspectRatio, nearClip, farClip);
+        gluPerspective(fieldOfView, aspectRatio, nearClip, farClip);
+    //gluLookAt(0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
 
     glMatrixMode(GL_MODELVIEW);
     if (resetCam) {
         glLoadIdentity();
+        gluLookAt(center[0], center[1], center[2], center[0] + 1.0f, center[1], center[2], 0.0f, 1.0f, 0.0f);
         //gluLookAt(0.0f, 2.0f, -12.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
-        gluLookAt(0.0f, 0.0f, -3.0f, 0.0f, 100.0f, -3.0f, 0.0f, 1.0f, 0.0f);
+        //glFrustum(center[0], center[0] - 0.5f, center[1], center[1] + 0.5f, center[2], center[2] - 0.5f);
         // Add a little rotation, using the elapsed time for smooth animation
 
         glRotatef(mx, 0, 1, 0);
@@ -591,20 +618,8 @@ void renderFrame(bool resetCam) {
 
     //glTranslatef(0.0f, -3.0, 0.0);
 
-    glEnable(GL_LIGHTING);
-    /*
-    GLfloat light_ambient[] = { 0.1, 0.1, 0.1, 1.0 };
-    GLfloat light_diffuse[] = { 1.0, 1.0, 1.0, 1.0 };
-    GLfloat light_specular[] = { 1.0, 1.0, 1.0, 1.0 };
+    setupLight();
 
-    glLightfv(GL_LIGHT0, GL_AMBIENT, light_ambient);
-    glLightfv(GL_LIGHT0, GL_DIFFUSE, light_diffuse);
-    glLightfv(GL_LIGHT0, GL_SPECULAR, light_specular);
-
-    GLfloat pos[4] = {0.0f, 11.0f, 0.0f, 1.0f};
-
-    glLightfv(GL_LIGHT0, GL_POSITION, pos);
-    */
 
 /*
 
