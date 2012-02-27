@@ -38,6 +38,8 @@ std::auto_ptr<Shader> shader;
 std::auto_ptr<sf::Image> diff_text;
 std::auto_ptr<sf::Image> spec_text;
 
+Assimp::Importer importers[2];
+
 // This creates an asset importer using the Open Asset Import library.
 // It automatically manages resources for you, and frees them when the program
 // exits.
@@ -125,19 +127,17 @@ struct asset {
 
 vector<asset> assets;
 
-asset loadAsset(const char* name) {
+asset loadAsset(const char* name, int imp) {
     asset a;
-    Assimp::Importer importer;
 
-    a.scene = importer.ReadFile(name,
+    a.scene = importers[imp].ReadFile(name,
         aiProcess_CalcTangentSpace |
         aiProcess_Triangulate |
         aiProcess_JoinIdenticalVertices |
         aiProcessPreset_TargetRealtime_Quality);
 
-    std::cerr << importer.GetErrorString();
     if (!a.scene || a.scene->mNumMeshes <= 0) {
-        std::cerr << importer.GetErrorString() << std::endl;
+        std::cerr << importers[imp].GetErrorString() << std::endl;
         exit(-1);
     }
 
@@ -151,8 +151,11 @@ void loadAssets() {
     //asset cathedral = loadAsset(MODEL_PATH_CATH);
     //assets.push_back(cathedral);
 
-    asset a = loadAsset(MODEL_PATH_ARMA);
+    asset a = loadAsset(MODEL_PATH_SPHE, 0);
     assets.push_back(a);
+
+    asset c = loadAsset(MODEL_PATH_CATH, 1);
+    assets.push_back(c);
 
     //asset sphere = loadAsset(MODEL_PATH_2);
     //assets.push_back(sphere);
