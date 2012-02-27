@@ -11,6 +11,7 @@
 #define DEBUG
 
 //TODO
+#define FILEPATH "/Users/grantm/class/cs248/assign3/"
 #define BASE_PATH "/Users/grantm/class/cs248/assign3/models/"
 #define MODEL_PATH_CATH "/Users/grantm/class/cs248/assign3/models/cathedral.3ds"
 #define MODEL_PATH_SPHE "/Users/grantm/class/cs248/assign3/models/sphere.3ds"
@@ -153,27 +154,28 @@ asset loadAsset(const char* name, int imp) {
 // scene is the object that the environment map is made from.
 void createEnvironmentMap(asset *a, asset *scene) {
     a->hasEnvMap = true;
-    GLuint face;
-    GLuint fbuffer;
     int SIZE = 64;
 
     GLfloat center[3] = {0.0f, 3.0f, 0.0f};
-    GLfloat distance = 5.0f;
+
+    /* Set up texture */
+    GLuint face;
 
     glGenTextures(1, &face);
     glBindTexture(GL_TEXTURE_CUBE_MAP, face);
-    for (int i = 0; i < 6; ++i) {
-        glTexParameterf(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameterf(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameterf(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameterf(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        glTexParameterf(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-    }
+    glTexParameterf(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameterf(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameterf(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameterf(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameterf(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
     for (uint i = 0; i < 6; i++) {
         glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGBA, SIZE, SIZE, 0, GL_RGBA, GL_FLOAT, NULL);
     }
 
     /* Set up frame buffer */
+    GLuint fbuffer;
+
     glGenFramebuffersEXT(1, &fbuffer);
     glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fbuffer);
     for (int i = 0; i < 6; ++i) {
@@ -186,39 +188,46 @@ void createEnvironmentMap(asset *a, asset *scene) {
 
     /* Now render all 6 faces */
 
+    GLfloat distance = 5.0f;
     glMatrixMode(GL_PROJECTION);
 
     /* Positive X */
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glLoadIdentity();
     gluLookAt(center[0], center[1], center[2], center[0] + distance, center[1], center[2], 0.0f, 1.0f, 0.0f);
     renderFrame(false);
     glCopyTexSubImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X, 0, 0, 0, 0, 0, SIZE, SIZE);
 
     /* Negative X */
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glLoadIdentity();
     gluLookAt(center[0], center[1], center[2], center[0] - distance, center[1], center[2], 0.0f, 1.0f, 0.0f);
     renderFrame(false);
     glCopyTexSubImage2D(GL_TEXTURE_CUBE_MAP_NEGATIVE_X, 0, 0, 0, 0, 0, SIZE, SIZE);
 
     /* Positive Y */
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glLoadIdentity();
     gluLookAt(center[0], center[1], center[2], center[0], center[1] + distance, center[2], 0.0f, 1.0f, 0.0f);
     renderFrame(false);
     glCopyTexSubImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_Y, 0, 0, 0, 0, 0, SIZE, SIZE);
 
     /* Negative Y */
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glLoadIdentity();
     gluLookAt(center[0], center[1], center[2], center[0], center[1] - distance, center[2], 0.0f, 1.0f, 0.0f);
     renderFrame(false);
     glCopyTexSubImage2D(GL_TEXTURE_CUBE_MAP_NEGATIVE_Y, 0, 0, 0, 0, 0, SIZE, SIZE);
 
     /* Positive Z */
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glLoadIdentity();
     gluLookAt(center[0], center[1], center[2], center[0], center[1], center[2] + distance, 0.0f, 1.0f, 0.0f);
     renderFrame(false);
     glCopyTexSubImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_Z, 0, 0, 0, 0, 0, SIZE, SIZE);
 
     /* Negative Z */
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glLoadIdentity();
     gluLookAt(center[0], center[1], center[2], center[0], center[1], center[2] - distance, 0.0f, 1.0f, 0.0f);
     renderFrame(false);
@@ -229,9 +238,10 @@ void createEnvironmentMap(asset *a, asset *scene) {
     GLubyte *data = new GLubyte[SIZE * SIZE * 4];
     glReadPixels(0, 0, SIZE, SIZE, GL_RGBA, GL_UNSIGNED_BYTE, data);
     img.LoadFromPixels(SIZE, SIZE, data);
-    img.SaveToFile("derp.jpg");
+    img.SaveToFile(FILEPATH "derp.jpg");
 
 
+    glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
 
 
     // glDrawBuffer(GL_COLOR_ATTACHMENT0_EXT);
@@ -253,9 +263,6 @@ void loadAssets() {
     asset c = loadAsset(MODEL_PATH_CATH, 1);
     assets.push_back(c);
 
-    //ENV TODO
-    //createEnvironmentMap(&a, &c);
-
     //asset sphere = loadAsset(MODEL_PATH_2);
     //assets.push_back(sphere);
 
@@ -270,6 +277,8 @@ void loadAssets() {
         cerr << "Shader failed to load." << endl;
         exit(-1);
     }
+
+    createEnvironmentMap(&a, &c);
 
     /*
     */
@@ -513,7 +522,7 @@ void setMaterial(const struct aiScene *scene, const struct aiMesh *mesh) {
     if (AI_SUCCESS == material->Get(AI_MATKEY_SHININESS, value)) {
         glUniform1f(shininess, value);
     } else {
-        glUniform1f(shininess, 40);
+        glUniform1f(shininess, 8);
     }
 }
 
