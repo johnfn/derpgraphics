@@ -40,7 +40,6 @@ std::auto_ptr<sf::Image> spec_text;
 // This creates an asset importer using the Open Asset Import library.
 // It automatically manages resources for you, and frees them when the program
 // exits.
-Assimp::Importer importer;
 
 void initOpenGL();
 void loadAssets();
@@ -127,6 +126,7 @@ vector<asset> assets;
 
 asset loadAsset(const char* name) {
     asset a;
+    Assimp::Importer importer;
 
     a.scene = importer.ReadFile(name,
         aiProcess_CalcTangentSpace |
@@ -149,8 +149,8 @@ void loadAssets() {
     asset cathedral = loadAsset(MODEL_PATH_1);
     assets.push_back(cathedral);
 
-    // asset sphere = loadAsset(MODEL_PATH_2);
-    // assets.push_back(sphere);
+    //asset sphere = loadAsset(MODEL_PATH_2);
+    //assets.push_back(sphere);
 
     // Read in an asset file, and do some post-processing.  There is much
     // more you can do with this asset loader, including load textures.
@@ -245,6 +245,16 @@ void apply_texture(const aiTextureType type, const string strType, const string 
     //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+    //TODO???????
+
+    /*
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    */
+
     img->Bind();
 }
 
@@ -261,7 +271,6 @@ void recursive_render (const struct aiScene *sc, struct aiNode *nd) {
         if (mesh->mPrimitiveTypes <= aiPrimitiveType_LINE) continue;
 
         //TODO: For now. I think I saw someone checking normals and then setting this accordingly.
-        glEnable(GL_LIGHTING);
 
         // where doing this man
         // where MAKING THIS HAPEN
@@ -325,22 +334,16 @@ void loadAndStoreImage(string filename, string basepath, aiTextureType type, boo
     img->LoadFromFile(filename);
     textureIdMap[make_pair(basepath, type)] = img;
 
-    GLenum texnum = to_texture_num(basepath, type);
+    to_texture_num(basepath, type);
 
-    glActiveTexture(texnum); // It seems I need to set *some* active texture, but it doesn't matter which one. (TODO?)
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    //glActiveTexture(texnum); // It seems I need to set *some* active texture, but it doesn't matter which one. (TODO?)
+    //img->Bind();
 
     /* With thanks to http://stackoverflow.com/questions/5436487/how-would-i-be-able-to-use-glu-rgba-or-other-glu-parameters */
     if (filter) {
-        #ifndef DEBUG
         gluBuild2DMipmaps(GL_TEXTURE_2D, GL_RGBA, img->GetWidth(), img->GetHeight(), GL_RGBA, GL_UNSIGNED_BYTE, img->GetPixelsPtr());
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-        #endif
     }
 
-    img->Bind();
 }
 
 void LoadGLTextures(const aiScene* scene) {
@@ -374,22 +377,6 @@ void LoadGLTextures(const aiScene* scene) {
             }
         }
     }
-    /*for (unsigned int m=0; m<scene->mNumMaterials; m++) {
-        int texIndex = 0;
-        aiReturn texFound = AI_SUCCESS;
-
-        aiString path;  // filename
-
-        while (texFound == AI_SUCCESS)
-        {
-            texFound = scene->mMaterials[m]->GetTexture(aiTextureType_DIFFUSE, texIndex, &path);
-            sf::Image *img = new sf::Image();
-            img->LoadFromFile(path.data);
-            textureIdMap[path.data] = img; //fill map with textures, pointers still NULL yet
-            texIndex++;
-        }
-    }
-    */
 }
 
 void setMaterial(const struct aiScene *scene, const struct aiMesh *mesh) {
@@ -421,22 +408,6 @@ void setMaterial(const struct aiScene *scene, const struct aiMesh *mesh) {
     } else {
         glUniform1f(shininess, 1);
     }
-}
-
-void setTextures() {
-    // Get a "handle" to the texture variables inside our shader.  Then
-    // pass two textures to the shader: one for diffuse, and the other for
-    // transparency.
-    GLint diffuse = glGetUniformLocation(shader->programID(), "diffuseMap");
-    glUniform1i(diffuse, 0); // The diffuse map will be GL_TEXTURE0
-    glActiveTexture(GL_TEXTURE0);
-    diff_text->Bind();
-
-    // Transparency
-    GLint specular = glGetUniformLocation(shader->programID(), "specularMap");
-    glUniform1i(specular, 1); // The transparency map will be GL_TEXTURE1
-    glActiveTexture(GL_TEXTURE1);
-    spec_text->Bind();
 }
 
 void drawMesh(const struct aiMesh *mesh) {
@@ -504,9 +475,11 @@ void renderFrame() {
     // Add a little rotation, using the elapsed time for smooth animation
 
     glRotatef(mx, 0, 1, 0);
-    //glRotatef(my, 0, 0, 1);
+    glRotatef(my, 0, 0, 1);
 
-    GLfloat light_ambient[] = { 0.2, 0.2, 0.2, 1.0 };
+    glEnable(GL_LIGHTING);
+    /*
+    GLfloat light_ambient[] = { 0.1, 0.1, 0.1, 1.0 };
     GLfloat light_diffuse[] = { 1.0, 1.0, 1.0, 1.0 };
     GLfloat light_specular[] = { 1.0, 1.0, 1.0, 1.0 };
 
@@ -517,6 +490,7 @@ void renderFrame() {
     GLfloat pos[4] = {0.0f, 11.0f, 0.0f, 1.0f};
 
     glLightfv(GL_LIGHT0, GL_POSITION, pos);
+    */
 
 /*
 
