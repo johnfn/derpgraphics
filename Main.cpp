@@ -12,8 +12,9 @@
 
 //TODO
 #define BASE_PATH "/Users/grantm/class/cs248/assign3/models/"
-#define MODEL_PATH_1 "/Users/grantm/class/cs248/assign3/models/cathedral.3ds"
-#define MODEL_PATH_2 "/Users/grantm/class/cs248/assign3/models/sphere.3ds"
+#define MODEL_PATH_CATH "/Users/grantm/class/cs248/assign3/models/cathedral.3ds"
+#define MODEL_PATH_SPHE "/Users/grantm/class/cs248/assign3/models/sphere.3ds"
+#define MODEL_PATH_ARMA "/Users/grantm/class/cs248/assign3/models/armadillo.3ds"
 #define SPEC_SUFFIX "_s.jpg"
 #define NORM_SUFFIX "_n.jpg"
 #define DIFF_SUFFIX "_d.jpg"
@@ -134,6 +135,7 @@ asset loadAsset(const char* name) {
         aiProcess_JoinIdenticalVertices |
         aiProcessPreset_TargetRealtime_Quality);
 
+    std::cerr << importer.GetErrorString();
     if (!a.scene || a.scene->mNumMeshes <= 0) {
         std::cerr << importer.GetErrorString() << std::endl;
         exit(-1);
@@ -146,8 +148,11 @@ asset loadAsset(const char* name) {
 }
 
 void loadAssets() {
-    asset cathedral = loadAsset(MODEL_PATH_1);
-    assets.push_back(cathedral);
+    //asset cathedral = loadAsset(MODEL_PATH_CATH);
+    //assets.push_back(cathedral);
+
+    asset a = loadAsset(MODEL_PATH_ARMA);
+    assets.push_back(a);
 
     //asset sphere = loadAsset(MODEL_PATH_2);
     //assets.push_back(sphere);
