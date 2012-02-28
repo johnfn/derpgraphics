@@ -483,13 +483,13 @@ void loadAndStoreImage(string filename, string basepath, aiTextureType type, boo
     img->LoadFromFile(filename);
     textureIdMap[make_pair(basepath, type)] = img;
 
-    to_texture_num(basepath, type);
+    int texnum = to_texture_num(basepath, type);
 
-    //glActiveTexture(texnum); // It seems I need to set *some* active texture, but it doesn't matter which one. (TODO?)
-    //img->Bind();
+    GL_CHECK(glActiveTexture(texnum)); // It seems I need to set *some* active texture, but it doesn't matter which one. (TODO?)
+    GL_CHECK(img->Bind());
 
     /* With thanks to http://stackoverflow.com/questions/5436487/how-would-i-be-able-to-use-glu-rgba-or-other-glu-parameters */
-    if (filter) {
+    if (filter && false) { //TODO remove false
         GL_CHECK(gluBuild2DMipmaps(GL_TEXTURE_2D, GL_RGBA, img->GetWidth(), img->GetHeight(), GL_RGBA, GL_UNSIGNED_BYTE, img->GetPixelsPtr()));
     }
 
@@ -502,28 +502,30 @@ void LoadGLTextures(const aiScene* scene) {
     for (unsigned int i = 0; i < scene->mNumMaterials; ++i) {
         for (unsigned int k = 0; k < scene->mMaterials[i]->mNumAllocated; k++) {
             aiString path;
+            string filename;
 
             if (AI_SUCCESS == scene->mMaterials[i]->GetTexture(aiTextureType_DIFFUSE, k, &path)) {
                 string basepath(path.data);
-                string filename(BASE_PATH);
 
                 /* Diffuse texture */
                 filename = stringify(BASE_PATH) + stringify(path.data) + stringify("_d.jpg");
                 if (fexists(filename.c_str())) loadAndStoreImage(filename, basepath, aiTextureType_DIFFUSE);
                 else {cout << "FAILED TO FIND" << endl; }
+                
 
                 /* Specular texture */
                 filename = stringify(BASE_PATH) + stringify(path.data) + stringify("_s.jpg");
-
+                
                 if (fexists(filename.c_str())) loadAndStoreImage(filename, basepath, aiTextureType_SPECULAR);
                 else {cout << "FAILED TO FIND" << endl; }
+                /*
 
                 filename = stringify(BASE_PATH) + stringify(path.data) + stringify("_n.jpg");
 
-                /* Normal texture? */
+                // Normal texture?
                 if (fexists(filename.c_str())) {
                     loadAndStoreImage(filename, basepath, aiTextureType_NORMALS, false);
-                }
+                }*/
             }
         }
     }
@@ -543,12 +545,12 @@ void setMaterial(const struct aiScene *scene, const struct aiMesh *mesh) {
 
     // Specular material
     GL_CHECK(specular = glGetUniformLocation(shader->programID(), "Ks"));
-    material->Get(AI_MATKEY_COLOR_DIFFUSE, color);
+    material->Get(AI_MATKEY_COLOR_SPECULAR, color);
     GL_CHECK(glUniform3f(specular, color.r, color.g, color.b));
 
     // Ambient material
     GL_CHECK(ambient = glGetUniformLocation(shader->programID(), "Ka"));
-    material->Get(AI_MATKEY_COLOR_DIFFUSE, color);
+    material->Get(AI_MATKEY_COLOR_AMBIENT, color);
     GL_CHECK(glUniform3f(ambient, color.r, color.g, color.b));
 
     // Specular power
