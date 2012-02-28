@@ -61,6 +61,7 @@ void LoadGLTextures(const aiScene* scene);
 GLenum error = glGetError();\
 if (GL_NO_ERROR != error) {\
     printf("Line %d: %s", __LINE__, gluErrorString(error));\
+    assert(false);\
 }\
 }
 
@@ -214,7 +215,6 @@ void createEnvironmentMap(asset *a, asset *scene) {
     for (int i = 0; i < 6; ++i) {
         GL_CHECK(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
 
-        GL_CHECK(glUseProgram(shader->programID()));
 
         GL_CHECK(glMatrixMode(GL_PROJECTION));
         GL_CHECK(glLoadIdentity());
@@ -283,8 +283,10 @@ void loadAssets() {
         cerr << "Shader failed to load." << endl;
         exit(-1);
     }
+    
+    GL_CHECK(glUseProgram(shader->programID()));
 
-    createEnvironmentMap(&a, &c);
+    //createEnvironmentMap(&a, &c);
 
     /*
     */
@@ -351,15 +353,15 @@ void handleInput() {
 }
 
 //strType == diffuseMap (for instance.)
-void apply_texture(const aiTextureType type, const string strType, const string strpath) {
+void apply_texture(const aiTextureType type, const char* strType, const string strpath) {
     GLenum textureNum = to_texture_num(strpath, type);
     GLint loc;
 
     cout << endl << " " << textureNum << " " << strType << endl;
-    GL_CHECK(loc = glGetUniformLocation(shader->programID(), strType.c_str()));
+    GL_CHECK(loc = glGetUniformLocation(shader->programID(), strType));
     GL_CHECK(glUniform1i(loc, textureNum - GL_TEXTURE0)); // The diffuse map will be
 
-    glActiveTexture(textureNum);
+    GL_CHECK(glActiveTexture(textureNum));
 
     sf::Image *img = textureIdMap[make_pair(strpath, type)];
 
@@ -369,8 +371,8 @@ void apply_texture(const aiTextureType type, const string strType, const string 
     //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    GL_CHECK(glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT));
+    GL_CHECK(glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT));
 
     //TODO???????
 
@@ -392,7 +394,7 @@ void recursive_render (const struct aiScene *sc, struct aiNode *nd, bool env_map
     for (int n = 0; n < nd->mNumMeshes; ++n) {
         const struct aiMesh* mesh = sc->mMeshes[nd->mMeshes[n]];
 
-        if (mesh->mPrimitiveTypes <= aiPrimitiveType_LINE) continue;
+        if (mesh->mPrimitiveTypes != aiPrimitiveType_TRIANGLE) continue;
 
         //TODO: For now. I think I saw someone checking normals and then setting this accordingly.
 
@@ -451,9 +453,9 @@ void recursive_render (const struct aiScene *sc, struct aiNode *nd, bool env_map
 
                 GLint viewMat;
                 GL_CHECK(viewMat = glGetUniformLocation(shader->programID(), "viewMatrix"));
-                GL_CHECK(glUniformMatrix4fv(viewMat, 9, false, (const GLfloat *)reducedMat));
+                GL_CHECK(glUniformMatrix3fv(viewMat, 1, false, (const GLfloat *)reducedMat));
             } else {
-                GLint hasEnv ;
+                GLint hasEnv;
                 GL_CHECK(hasEnv = glGetUniformLocation(shader->programID(), "hasEnvMapping"));
                 GL_CHECK(glUniform1i(hasEnv, false));
             }
@@ -596,7 +598,9 @@ void drawMesh(const struct aiMesh *mesh) {
     GL_CHECK(glEnableVertexAttribArray(biTangent));
     GL_CHECK(glVertexAttribPointer(biTangent, 3, GL_FLOAT, 0, sizeof(aiVector3D), mesh->mBitangents));
 
-    GL_CHECK(glDrawElements(GL_TRIANGLES, 3 * mesh->mNumFaces, GL_UNSIGNED_INT, &indexBuffer[0]));
+    if (mesh->mPrimitiveTypes == aiPrimitiveType_TRIANGLE) {
+        GL_CHECK(glDrawElements(GL_TRIANGLES, 3 * mesh->mNumFaces, GL_UNSIGNED_INT, &indexBuffer[0]));
+    }
 }
 
 void setupLight() {
@@ -623,8 +627,6 @@ void renderFrame(bool resetCam) {
     GLfloat center[3] = {0.0f, 0.0f, 0.0f};
 
     GL_CHECK(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
-
-    glUseProgram(shader->programID());
 
     GLfloat aspectRatio = (GLfloat)window.GetWidth()/window.GetHeight();
     GLfloat nearClip = 0.1f;
@@ -685,7 +687,8 @@ void renderFrame(bool resetCam) {
     //setTextures();
 
     for (int i = 0; i < assets.size(); ++i) {
-        recursive_render(assets[i].scene, assets[i].scene->mRootNode, i == 0);
+        //TODO ENV TODO
+        recursive_render(assets[i].scene, assets[i].scene->mRootNode, false);
     }
 }
 
