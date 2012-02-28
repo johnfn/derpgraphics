@@ -9,6 +9,7 @@
 
 //TODO
 #define DEBUG
+#define SFML_DEBUG
 
 //TODO
 #define FILEPATH "/Users/grantm/class/cs248/assign3/"
@@ -260,17 +261,11 @@ void createEnvironmentMap(asset *a, asset *scene) {
 }
 
 void loadAssets() {
-    //asset cathedral = loadAsset(MODEL_PATH_CATH);
-    //assets.push_back(cathedral);
-
-    //asset a = loadAsset(MODEL_PATH_SPHE, 0);
-    //assets.push_back(a);
+    asset a = loadAsset(MODEL_PATH_SPHE, 0);
+    assets.push_back(a);
 
     asset c = loadAsset(MODEL_PATH_CATH, 1);
     assets.push_back(c);
-
-    //asset sphere = loadAsset(MODEL_PATH_2);
-    //assets.push_back(sphere);
 
     // Read in an asset file, and do some post-processing.  There is much
     // more you can do with this asset loader, including load textures.
@@ -286,17 +281,6 @@ void loadAssets() {
 
 
     //createEnvironmentMap(&a, &c);
-
-    /*
-    */
-
-    //loadShader(fragShader, "/Users/grantm/class/cs248/assign3/shaders/phong.frag.glsl");
-    //loadShader(vertShader, "/Users/grantm/class/cs248/assign3/shaders/phong.vert.glsl");
-
-
-    //////////////////////////////////////////////////////////////////////////
-    // TODO: LOAD YOUR SHADERS/TEXTURES
-    //////////////////////////////////////////////////////////////////////////
 }
 
 
@@ -482,17 +466,6 @@ void loadAndStoreImage(string filename, string basepath, aiTextureType type, boo
     sf::Image *img = new sf::Image();
     img->LoadFromFile(filename);
     textureIdMap[make_pair(basepath, type)] = img;
-
-    int texnum = to_texture_num(basepath, type);
-
-    GL_CHECK(glActiveTexture(texnum)); // It seems I need to set *some* active texture, but it doesn't matter which one. (TODO?)
-    GL_CHECK(img->Bind());
-
-    /* With thanks to http://stackoverflow.com/questions/5436487/how-would-i-be-able-to-use-glu-rgba-or-other-glu-parameters */
-    if (filter && false) { //TODO remove false
-        GL_CHECK(gluBuild2DMipmaps(GL_TEXTURE_2D, GL_RGBA, img->GetWidth(), img->GetHeight(), GL_RGBA, GL_UNSIGNED_BYTE, img->GetPixelsPtr()));
-    }
-
 }
 
 void LoadGLTextures(const aiScene* scene) {
@@ -506,26 +479,27 @@ void LoadGLTextures(const aiScene* scene) {
 
             if (AI_SUCCESS == scene->mMaterials[i]->GetTexture(aiTextureType_DIFFUSE, k, &path)) {
                 string basepath(path.data);
+                cout << basepath << endl;
 
                 /* Diffuse texture */
                 filename = stringify(BASE_PATH) + stringify(path.data) + stringify("_d.jpg");
                 if (fexists(filename.c_str())) loadAndStoreImage(filename, basepath, aiTextureType_DIFFUSE);
                 else {cout << "FAILED TO FIND" << endl; }
-                
+
 
                 /* Specular texture */
                 filename = stringify(BASE_PATH) + stringify(path.data) + stringify("_s.jpg");
-                
+
                 if (fexists(filename.c_str())) loadAndStoreImage(filename, basepath, aiTextureType_SPECULAR);
                 else {cout << "FAILED TO FIND" << endl; }
-                /*
+
 
                 filename = stringify(BASE_PATH) + stringify(path.data) + stringify("_n.jpg");
 
                 // Normal texture?
                 if (fexists(filename.c_str())) {
                     loadAndStoreImage(filename, basepath, aiTextureType_NORMALS, false);
-                }*/
+                }
             }
         }
     }
