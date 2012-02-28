@@ -28,7 +28,7 @@ using namespace std;
 sf::WindowSettings settings(24, 8, 2);
 sf::Window window(sf::VideoMode(800, 600), "CS248 Rules!", sf::Style::Close, settings);
 
-void recursive_render (const struct aiScene *sc, struct aiNode *nd);
+void recursive_render (const struct aiScene *sc, struct aiNode *nd, bool env_mapping = false);
 std::map<pair<string, aiTextureType>, sf::Image*> textureIdMap; //TODO: Not an ID map any more.
 void setupLight();
 
@@ -60,7 +60,7 @@ void LoadGLTextures(const aiScene* scene);
 (x);\
 GLenum error = glGetError();\
 if (GL_NO_ERROR != error) {\
-    printf("%s", gluErrorString(error));\
+    printf("Line %d: %s", __LINE__, gluErrorString(error));\
 }\
 }
 
@@ -121,10 +121,10 @@ void initOpenGL() {
 
     // This initializes OpenGL with some common defaults.  More info here:
     // http://www.sfml-dev.org/tutorials/1.6/window-opengl.php
-    glClearDepth(1.0f);
-    glClearColor(0.15f, 0.15f, 0.15f, 1.0f);
-    glEnable(GL_DEPTH_TEST);
-    glViewport(0, 0, window.GetWidth(), window.GetHeight());
+    GL_CHECK(glClearDepth(1.0f));
+    GL_CHECK(glClearColor(0.15f, 0.15f, 0.15f, 1.0f));
+    GL_CHECK(glEnable(GL_DEPTH_TEST));
+    GL_CHECK(glViewport(0, 0, window.GetWidth(), window.GetHeight()));
 }
 
 struct asset {
@@ -154,6 +154,8 @@ asset loadAsset(const char* name, int imp) {
     return a;
 }
 
+GLuint envmap;
+
 // a is the object that has the environment map
 // scene is the object that the environment map is made from.
 void createEnvironmentMap(asset *a, asset *scene) {
@@ -163,32 +165,31 @@ void createEnvironmentMap(asset *a, asset *scene) {
     GLfloat center[3] = {0.0f, 2.0f, 0.0f};
 
     /* Set up texture */
-    GLuint face;
 
-    glGenTextures(1, &face);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, face);
-    glTexParameterf(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameterf(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameterf(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameterf(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameterf(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    GL_CHECK(glGenTextures(1, &envmap));
+    GL_CHECK(glBindTexture(GL_TEXTURE_CUBE_MAP, envmap));
+    GL_CHECK(glTexParameterf(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR));
+    GL_CHECK(glTexParameterf(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
+    GL_CHECK(glTexParameterf(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE));
+    GL_CHECK(glTexParameterf(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE));
+    GL_CHECK(glTexParameterf(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE));
 
     for (uint i = 0; i < 6; i++) {
-        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGBA, SIZE, SIZE, 0, GL_RGBA, GL_FLOAT, NULL);
+        GL_CHECK(glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGBA, SIZE, SIZE, 0, GL_RGBA, GL_FLOAT, NULL));
     }
 
     /* Set up frame buffer */
     GLuint fbuffer;
 
-    glGenFramebuffersEXT(1, &fbuffer);
-    glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fbuffer);
+    GL_CHECK(glGenFramebuffersEXT(1, &fbuffer));
+    GL_CHECK(glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fbuffer));
     for (int i = 0; i < 6; ++i) {
-        glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, face, 0);
-        //glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_DEPTH_ATTACHMENT_EXT, GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, <cubeMapDepthTextureId>, 0);
+        GL_CHECK(glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, envmap, 0));
+        //glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_DEPTH_ATTACHMENT_EXT, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, <cubeMapDepthTextureId>, 0);
 
     }
     // glFramebufferTextureARB(GL_FRAMEBUFFER_EXT, GL_DEPTH_ATTACHMENT_EXT, tDepthCubeMap, 0);
-    // glFramebufferTexture2D(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, face, 0, 1); //TODO 1 totally bogus
+    // glFramebufferTexture2D(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, envmap, 0, 1); //TODO 1 totally bogus
 
     //TODO: Some sort of bizarre shader thing?????
 
@@ -210,30 +211,29 @@ void createEnvironmentMap(asset *a, asset *scene) {
                           , { 0.0f, 1.0f, 0.0f}
                           , };
 
-
-    glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0); //TODO
-
     for (int i = 0; i < 6; ++i) {
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        GL_CHECK(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
 
-        glUseProgram(shader->programID());
+        GL_CHECK(glUseProgram(shader->programID()));
 
-        glMatrixMode(GL_PROJECTION);
-        glLoadIdentity();
-        gluPerspective(90.0, 1.0f, 0.1f, 500.0f);
+        GL_CHECK(glMatrixMode(GL_PROJECTION));
+        GL_CHECK(glLoadIdentity());
+        GL_CHECK(gluPerspective(90.0, 1.0f, 0.1f, 500.0f));
 
-        glMatrixMode(GL_MODELVIEW);
-        glLoadIdentity();
+        GL_CHECK(glMatrixMode(GL_MODELVIEW));
+        GL_CHECK(glLoadIdentity());
 
-        gluLookAt(center[0],                center[1],                center[2],
+        GL_CHECK(gluLookAt(center[0],                center[1],                center[2],
                   center[0] + deltas[i][0], center[1] + deltas[i][1], center[2] + deltas[i][2],
-                  uppos[i][0]             , uppos[i][1]             , uppos[i][2]             );
+                  uppos[i][0]             , uppos[i][1]             , uppos[i][2]             ));
 
         setupLight();
         recursive_render(scene->scene, scene->scene->mRootNode);
-        //glBindTexture(GL_TEXTURE_CUBE_MAP, face);
-        //glCopyTexSubImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, 0, 0, 0, 0, SIZE, SIZE);
 
+        GL_CHECK(glBindTexture(GL_TEXTURE_CUBE_MAP, envmap));
+        GL_CHECK(glCopyTexSubImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, 0, 0, 0, 0, SIZE, SIZE));
+
+        /*
         string out = FILEPATH "derp";
         out += (i + '0');
         out += ".jpg";
@@ -243,13 +243,11 @@ void createEnvironmentMap(asset *a, asset *scene) {
         glReadPixels(0, 0, SIZE, SIZE, GL_RGBA, GL_UNSIGNED_BYTE, data);
         img.LoadFromPixels(SIZE, SIZE, data);
         img.SaveToFile(out);
+        */
     }
 
 
-    //exit(0);
-
-
-
+    GL_CHECK(glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0));
 
 
     // glDrawBuffer(GL_COLOR_ATTACHMENT0_EXT);
@@ -355,9 +353,11 @@ void handleInput() {
 //strType == diffuseMap (for instance.)
 void apply_texture(const aiTextureType type, const string strType, const string strpath) {
     GLenum textureNum = to_texture_num(strpath, type);
+    GLint loc;
 
-    GLint loc = glGetUniformLocation(shader->programID(), strType.c_str());
-    glUniform1i(loc, textureNum - GL_TEXTURE0); // The diffuse map will be
+    cout << endl << " " << textureNum << " " << strType << endl;
+    GL_CHECK(loc = glGetUniformLocation(shader->programID(), strType.c_str()));
+    GL_CHECK(glUniform1i(loc, textureNum - GL_TEXTURE0)); // The diffuse map will be
 
     glActiveTexture(textureNum);
 
@@ -382,11 +382,11 @@ void apply_texture(const aiTextureType type, const string strType, const string 
     img->Bind();
 }
 
-void recursive_render (const struct aiScene *sc, struct aiNode *nd) {
+void recursive_render (const struct aiScene *sc, struct aiNode *nd, bool env_mapping) {
     struct aiMatrix4x4 m = nd->mTransformation;
     m.Transpose();
-    glPushMatrix();
-    glMultMatrixf((float*)&m);
+    GL_CHECK(glPushMatrix());
+    GL_CHECK(glMultMatrixf((float*)&m));
     //glTranslatef(dx, dy, 0);
 
     for (int n = 0; n < nd->mNumMeshes; ++n) {
@@ -411,32 +411,61 @@ void recursive_render (const struct aiScene *sc, struct aiNode *nd) {
         //apply_material(mtl);
         setMaterial(sc, mesh);
 
-        if(AI_SUCCESS == mtl->GetTexture(aiTextureType_DIFFUSE, 0 /*texIndex*/, &texPath)) {
-            /* Diffuse */
+        if(AI_SUCCESS == mtl->GetTexture(aiTextureType_DIFFUSE, 0, &texPath)) {
+            // Diffuse
 
             string strpath(texPath.data);
 
             apply_texture(aiTextureType_DIFFUSE, "diffuseMap", strpath);
 
-            /* Specular */
+            // Specular
             apply_texture(aiTextureType_SPECULAR, "specularMap", strpath);
 
+            GLint hasNormal;
+            GL_CHECK(hasNormal = glGetUniformLocation(shader->programID(), "hasNormalMapping"));
+
             if (textureIdMap.count(make_pair(strpath, aiTextureType_NORMALS)) != 0) {
-                GLint hasNormal = glGetUniformLocation(shader->programID(), "hasNormalMapping");
-                glUniform1i(hasNormal, true);
+                GL_CHECK(glUniform1i(hasNormal, 1));
 
                 apply_texture(aiTextureType_NORMALS, "normalMap", strpath);
+            } else {
+                GL_CHECK(glUniform1i(hasNormal, 0));
+            }
+
+            if (env_mapping) {
+                GLint hasEnv = glGetUniformLocation(shader->programID(), "hasEnvMapping");
+                GL_CHECK(glUniform1i(hasEnv, 1));
+
+                GLint envCube = glGetUniformLocation(shader->programID(), "envCube");
+                GL_CHECK(glUniform1i(envCube, envmap));
+
+                GLdouble modelMatrix[16];
+                GL_CHECK(glGetDoublev(GL_MODELVIEW, modelMatrix));
+
+                GLdouble reducedMat[9] = {0};
+                for (int i = 0; i < 3; ++i) {
+                    for (int j = 0; j < 3; ++j) {
+                        reducedMat[i * 4 + j] = modelMatrix[i * 3 + j];
+                    }
+                }
+
+                GLint viewMat;
+                GL_CHECK(viewMat = glGetUniformLocation(shader->programID(), "viewMatrix"));
+                GL_CHECK(glUniformMatrix4fv(viewMat, 9, false, (const GLfloat *)reducedMat));
+            } else {
+                GLint hasEnv ;
+                GL_CHECK(hasEnv = glGetUniformLocation(shader->programID(), "hasEnvMapping"));
+                GL_CHECK(glUniform1i(hasEnv, false));
             }
         }
-
         drawMesh(mesh);
     }
 
     for (int n = 0; n < nd->mNumChildren; ++n) {
-        recursive_render(sc, nd->mChildren[n]);
+        recursive_render(sc, nd->mChildren[n], env_mapping);
     }
 
-    glPopMatrix();
+    GL_CHECK(glPopMatrix());
 }
 
 
@@ -460,7 +489,7 @@ void loadAndStoreImage(string filename, string basepath, aiTextureType type, boo
 
     /* With thanks to http://stackoverflow.com/questions/5436487/how-would-i-be-able-to-use-glu-rgba-or-other-glu-parameters */
     if (filter) {
-        gluBuild2DMipmaps(GL_TEXTURE_2D, GL_RGBA, img->GetWidth(), img->GetHeight(), GL_RGBA, GL_UNSIGNED_BYTE, img->GetPixelsPtr());
+        GL_CHECK(gluBuild2DMipmaps(GL_TEXTURE_2D, GL_RGBA, img->GetWidth(), img->GetHeight(), GL_RGBA, GL_UNSIGNED_BYTE, img->GetPixelsPtr()));
     }
 
 }
@@ -505,27 +534,28 @@ void setMaterial(const struct aiScene *scene, const struct aiMesh *mesh) {
     // Get a handle to the diffuse, specular, and ambient variables
     // inside the shader.  Then set them with the diffuse, specular, and
     // ambient color.
-    GLint diffuse = glGetUniformLocation(shader->programID(), "Kd");
+    GLint diffuse, specular, ambient, shininess;
+    GL_CHECK(diffuse = glGetUniformLocation(shader->programID(), "Kd"));
     material->Get(AI_MATKEY_COLOR_DIFFUSE, color);
-    glUniform3f(diffuse, color.r, color.g, color.b);
+    GL_CHECK(glUniform3f(diffuse, color.r, color.g, color.b));
 
     // Specular material
-    GLint specular = glGetUniformLocation(shader->programID(), "Ks");
+    GL_CHECK(specular = glGetUniformLocation(shader->programID(), "Ks"));
     material->Get(AI_MATKEY_COLOR_DIFFUSE, color);
-    glUniform3f(specular, color.r, color.g, color.b);
+    GL_CHECK(glUniform3f(specular, color.r, color.g, color.b));
 
     // Ambient material
-    GLint ambient = glGetUniformLocation(shader->programID(), "Ka");
+    GL_CHECK(ambient = glGetUniformLocation(shader->programID(), "Ka"));
     material->Get(AI_MATKEY_COLOR_DIFFUSE, color);
-    glUniform3f(ambient, color.r, color.g, color.b);
+    GL_CHECK(glUniform3f(ambient, color.r, color.g, color.b));
 
     // Specular power
-    GLint shininess = glGetUniformLocation(shader->programID(), "alpha");
+    GL_CHECK(shininess = glGetUniformLocation(shader->programID(), "alpha"));
     float value;
     if (AI_SUCCESS == material->Get(AI_MATKEY_SHININESS, value)) {
-        glUniform1f(shininess, value);
+        GL_CHECK(glUniform1f(shininess, value));
     } else {
-        glUniform1f(shininess, 8);
+        GL_CHECK(glUniform1f(shininess, 8));
     }
 }
 
@@ -539,47 +569,49 @@ void drawMesh(const struct aiMesh *mesh) {
         }
     }
 
+    GLint position, texcoord, normal, tangent, biTangent;
+
     // Get a handle to the variables for the vertex data inside the shader.
-    GLint position = glGetAttribLocation(shader->programID(), "positionIn");
-    glEnableVertexAttribArray(position);
-    glVertexAttribPointer(position, 3, GL_FLOAT, 0, sizeof(aiVector3D), mesh->mVertices);
+    GL_CHECK(position = glGetAttribLocation(shader->programID(), "positionIn"));
+    GL_CHECK(glEnableVertexAttribArray(position));
+    GL_CHECK(glVertexAttribPointer(position, 3, GL_FLOAT, 0, sizeof(aiVector3D), mesh->mVertices));
 
     // Texture coords.  Note the [0] at the end, very important
-    GLint texcoord = glGetAttribLocation(shader->programID(), "texcoordIn");
-    glEnableVertexAttribArray(texcoord);
-    glVertexAttribPointer(texcoord, 2, GL_FLOAT, 0, sizeof(aiVector3D), mesh->mTextureCoords[0]);
+    GL_CHECK(texcoord = glGetAttribLocation(shader->programID(), "texcoordIn"));
+    GL_CHECK(glEnableVertexAttribArray(texcoord));
+    GL_CHECK(glVertexAttribPointer(texcoord, 2, GL_FLOAT, 0, sizeof(aiVector3D), mesh->mTextureCoords[0]));
 
     // Normals
-    GLint normal = glGetAttribLocation(shader->programID(), "normalIn");
-    glEnableVertexAttribArray(normal);
-    glVertexAttribPointer(normal, 3, GL_FLOAT, 0, sizeof(aiVector3D), mesh->mNormals);
+    GL_CHECK(normal = glGetAttribLocation(shader->programID(), "normalIn"));
+    GL_CHECK(glEnableVertexAttribArray(normal));
+    GL_CHECK(glVertexAttribPointer(normal, 3, GL_FLOAT, 0, sizeof(aiVector3D), mesh->mNormals));
 
     //Tangent
-    GLint tangent = glGetAttribLocation(shader->programID(), "tangentIn");
-    glEnableVertexAttribArray(tangent);
-    glVertexAttribPointer(tangent, 3, GL_FLOAT, 0, sizeof(aiVector3D), mesh->mTangents);
+    GL_CHECK(tangent = glGetAttribLocation(shader->programID(), "tangentIn"));
+    GL_CHECK(glEnableVertexAttribArray(tangent));
+    GL_CHECK(glVertexAttribPointer(tangent, 3, GL_FLOAT, 0, sizeof(aiVector3D), mesh->mTangents));
 
     //Bitangent
-    GLint biTangent = glGetAttribLocation(shader->programID(), "biTangentIn");
-    glEnableVertexAttribArray(biTangent);
-    glVertexAttribPointer(biTangent, 3, GL_FLOAT, 0, sizeof(aiVector3D), mesh->mBitangents);
+    GL_CHECK(biTangent = glGetAttribLocation(shader->programID(), "bitangentIn"));
+    GL_CHECK(glEnableVertexAttribArray(biTangent));
+    GL_CHECK(glVertexAttribPointer(biTangent, 3, GL_FLOAT, 0, sizeof(aiVector3D), mesh->mBitangents));
 
-    glDrawElements(GL_TRIANGLES, 3 * mesh->mNumFaces, GL_UNSIGNED_INT, &indexBuffer[0]);
+    GL_CHECK(glDrawElements(GL_TRIANGLES, 3 * mesh->mNumFaces, GL_UNSIGNED_INT, &indexBuffer[0]));
 }
 
 void setupLight() {
-    glEnable(GL_LIGHTING);
+    GL_CHECK(glEnable(GL_LIGHTING));
     GLfloat light_ambient[] = { 0.1, 0.1, 0.1, 1.0 };
     GLfloat light_diffuse[] = { 1.0, 1.0, 1.0, 1.0 };
     GLfloat light_specular[] = { 1.0, 1.0, 1.0, 1.0 };
 
-    glLightfv(GL_LIGHT0, GL_AMBIENT, light_ambient);
-    glLightfv(GL_LIGHT0, GL_DIFFUSE, light_diffuse);
-    glLightfv(GL_LIGHT0, GL_SPECULAR, light_specular);
+    GL_CHECK(glLightfv(GL_LIGHT0, GL_AMBIENT, light_ambient));
+    GL_CHECK(glLightfv(GL_LIGHT0, GL_DIFFUSE, light_diffuse));
+    GL_CHECK(glLightfv(GL_LIGHT0, GL_SPECULAR, light_specular));
 
     GLfloat pos[4] = {0.0f, 11.0f, 0.0f, 1.0f};
 
-    glLightfv(GL_LIGHT0, GL_POSITION, pos);
+    GL_CHECK(glLightfv(GL_LIGHT0, GL_POSITION, pos));
 }
 
 void renderFrame(bool resetCam) {
@@ -588,9 +620,9 @@ void renderFrame(bool resetCam) {
     // in this assignment as you wish.
     //////////////////////////////////////////////////////////////////////////
 
-    GLfloat center[3] = {0.0f, 2.0f, 0.0f};
+    GLfloat center[3] = {0.0f, 0.0f, 0.0f};
 
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    GL_CHECK(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
 
     glUseProgram(shader->programID());
 
@@ -599,21 +631,21 @@ void renderFrame(bool resetCam) {
     GLfloat farClip = 500.0f;
     GLfloat fieldOfView = 45.0f; // Degrees
 
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-        gluPerspective(fieldOfView, aspectRatio, nearClip, farClip);
+    GL_CHECK(glMatrixMode(GL_PROJECTION));
+    GL_CHECK(glLoadIdentity());
+        GL_CHECK(gluPerspective(fieldOfView, aspectRatio, nearClip, farClip));
     //gluLookAt(0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
 
-    glMatrixMode(GL_MODELVIEW);
+    GL_CHECK(glMatrixMode(GL_MODELVIEW));
     if (resetCam) {
-        glLoadIdentity();
-        gluLookAt(center[0], center[1], center[2], center[0] + 1.0f, center[1], center[2], 0.0f, 1.0f, 0.0f);
-        //gluLookAt(0.0f, 2.0f, -12.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+        GL_CHECK(glLoadIdentity());
+        //gluLookAt(center[0], center[1], center[2], center[0] + 1.0f, center[1], center[2], 0.0f, 1.0f, 0.0f);
+        GL_CHECK(gluLookAt(0.0f, 2.0f, -12.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f));
         //glFrustum(center[0], center[0] - 0.5f, center[1], center[1] + 0.5f, center[2], center[2] - 0.5f);
         // Add a little rotation, using the elapsed time for smooth animation
 
-        glRotatef(mx, 0, 1, 0);
-        glRotatef(my, 0, 0, 1);
+        GL_CHECK(glRotatef(mx, 0, 1, 0));
+        GL_CHECK(glRotatef(my, 0, 0, 1));
     }
 
     //glTranslatef(0.0f, -3.0, 0.0);
@@ -653,7 +685,7 @@ void renderFrame(bool resetCam) {
     //setTextures();
 
     for (int i = 0; i < assets.size(); ++i) {
-        recursive_render(assets[i].scene, assets[i].scene->mRootNode);
+        recursive_render(assets[i].scene, assets[i].scene->mRootNode, i == 0);
     }
 }
 

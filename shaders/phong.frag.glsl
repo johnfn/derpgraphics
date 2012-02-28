@@ -7,12 +7,16 @@ uniform sampler2D diffuseMap;
 uniform sampler2D specularMap;
 uniform sampler2D normalMap;
 
+uniform samplerCube envCube;
+
 // Diffuse, ambient, and specular materials.  These are also uniform.
 uniform vec3 Kd;
 uniform vec3 Ks;
 uniform vec3 Ka;
 uniform float alpha;
-uniform bool hasNormalMapping;
+uniform mat3 viewMatrix;
+uniform int hasNormalMapping;
+uniform int hasEnvMapping;
 
 // These are values that OpenGL interpoates for us.  Note that some of these
 // are repeated from the fragment shader.  That's because they're passed
@@ -31,7 +35,7 @@ void main() {
 	// from what you did in Assignment 2.
 	vec3 N = normalize(normal);
 
-	if (hasNormalMapping) {
+	if (hasNormalMapping == 1) {
 		mat3 normalMatrix = mat3(tangent, bitangent, normal);
 		normalMatrix = transpose(normalMatrix);
 
@@ -65,5 +69,11 @@ void main() {
 
 	// This actually writes to the frame buffer
 
-	gl_FragColor = vec4(diffuse + specular + ambient, 1);
+	if (hasEnvMapping == 1) {
+		//TODO almost certainly wrong
+		vec3 newR = transpose(viewMatrix) * R;
+		gl_FragColor = textureCube(envCube, newR);
+	} else {
+		gl_FragColor = vec4(diffuse + specular + ambient, 1);
+	}
 }
