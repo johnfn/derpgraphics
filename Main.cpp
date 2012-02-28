@@ -336,20 +336,19 @@ void handleInput() {
 }
 
 //strType == diffuseMap (for instance.)
-void apply_texture(const aiTextureType type, const char* strType, const string strpath) {
+void apply_texture(const aiTextureType type, const char* strType, const string strpath, int texnum) {
     pair<string, aiTextureType> identifier = make_pair(strpath, type);
     if (textureIdMap.count(identifier) == 0) return;
-
-    GLenum textureNum = to_texture_num(strpath, type);
+    
     GLint loc;
-
-    cout << endl << " " << textureNum << " " << strType << endl;
-    GL_CHECK(loc = glGetUniformLocation(shader->programID(), strType));
-    GL_CHECK(glUniform1i(loc, textureNum - GL_TEXTURE0)); // The diffuse map will be
-
-    GL_CHECK(glActiveTexture(textureNum));
-
+    
+    GL_CHECK(glActiveTexture(GL_TEXTURE0 + texnum));
+    
     sf::Image *img = textureIdMap[identifier];
+    GL_CHECK(img->Bind());
+
+    GL_CHECK(loc = glGetUniformLocation(shader->programID(), strType));
+    GL_CHECK(glUniform1i(loc, texnum));    
 
     /* With thanks to http://stackoverflow.com/questions/5436487/how-would-i-be-able-to-use-glu-rgba-or-other-glu-parameters */
     //TODO: Far too slow. Preprocess.
@@ -359,14 +358,6 @@ void apply_texture(const aiTextureType type, const char* strType, const string s
 
     GL_CHECK(glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT));
     GL_CHECK(glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT));
-
-    //TODO???????
-
-    /*
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    */
-    GL_CHECK(img->Bind());
 }
 
 void recursive_render (const struct aiScene *sc, struct aiNode *nd, bool env_mapping) {
@@ -396,26 +387,32 @@ void recursive_render (const struct aiScene *sc, struct aiNode *nd, bool env_map
 
         if(AI_SUCCESS == mtl->GetTexture(aiTextureType_DIFFUSE, 0, &texPath)) {
             // Diffuse
+            
+            //NOT SURE IF THIS CLEARS STUFF OUT - TODO -
+            glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, 0);
+            glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D, 0);
+            glActiveTexture(GL_TEXTURE2); glBindTexture(GL_TEXTURE_2D, 0);
 
             string strpath(texPath.data);
 
-            apply_texture(aiTextureType_DIFFUSE, "diffuseMap", strpath);
+            apply_texture(aiTextureType_DIFFUSE, "diffuseMap", strpath, 0);
 
             // Specular
-            apply_texture(aiTextureType_SPECULAR, "specularMap", strpath);
+            apply_texture(aiTextureType_SPECULAR, "specularMap", strpath, 1);
 
-            /*
+            
             GLint hasNormal;
             GL_CHECK(hasNormal = glGetUniformLocation(shader->programID(), "hasNormalMapping"));
 
             if (textureIdMap.count(make_pair(strpath, aiTextureType_NORMALS)) != 0) {
                 GL_CHECK(glUniform1i(hasNormal, 1));
 
-                apply_texture(aiTextureType_NORMALS, "normalMap", strpath);
+                apply_texture(aiTextureType_NORMALS, "normalMap", strpath, 2);
             } else {
                 GL_CHECK(glUniform1i(hasNormal, 0));
             }
-
+                        
+            /*
             if (env_mapping) {
                 GLint hasEnv = glGetUniformLocation(shader->programID(), "hasEnvMapping");
                 GL_CHECK(glUniform1i(hasEnv, 1));
@@ -479,20 +476,16 @@ void LoadGLTextures(const aiScene* scene) {
 
             if (AI_SUCCESS == scene->mMaterials[i]->GetTexture(aiTextureType_DIFFUSE, k, &path)) {
                 string basepath(path.data);
-                cout << basepath << endl;
 
                 /* Diffuse texture */
                 filename = stringify(BASE_PATH) + stringify(path.data) + stringify("_d.jpg");
                 if (fexists(filename.c_str())) loadAndStoreImage(filename, basepath, aiTextureType_DIFFUSE);
-                else {cout << "FAILED TO FIND" << endl; }
 
 
                 /* Specular texture */
                 filename = stringify(BASE_PATH) + stringify(path.data) + stringify("_s.jpg");
 
                 if (fexists(filename.c_str())) loadAndStoreImage(filename, basepath, aiTextureType_SPECULAR);
-                else {cout << "FAILED TO FIND" << endl; }
-
 
                 filename = stringify(BASE_PATH) + stringify(path.data) + stringify("_n.jpg");
 
@@ -565,7 +558,6 @@ void drawMesh(const struct aiMesh *mesh) {
     GL_CHECK(glVertexAttribPointer(normal, 3, GL_FLOAT, 0, sizeof(aiVector3D), mesh->mNormals));
 
     //Tangent
-    /*
     GL_CHECK(tangent = glGetAttribLocation(shader->programID(), "tangentIn"));
     GL_CHECK(glEnableVertexAttribArray(tangent));
     GL_CHECK(glVertexAttribPointer(tangent, 3, GL_FLOAT, 0, sizeof(aiVector3D), mesh->mTangents));
@@ -574,7 +566,6 @@ void drawMesh(const struct aiMesh *mesh) {
     GL_CHECK(biTangent = glGetAttribLocation(shader->programID(), "bitangentIn"));
     GL_CHECK(glEnableVertexAttribArray(biTangent));
     GL_CHECK(glVertexAttribPointer(biTangent, 3, GL_FLOAT, 0, sizeof(aiVector3D), mesh->mBitangents));
-     */
 
     if (mesh->mPrimitiveTypes == aiPrimitiveType_TRIANGLE) {
         GL_CHECK(glDrawElements(GL_TRIANGLES, 3 * mesh->mNumFaces, GL_UNSIGNED_INT, &indexBuffer[0]));
