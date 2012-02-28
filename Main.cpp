@@ -604,19 +604,19 @@ void renderFrame(bool resetCam) {
 
     GL_CHECK(glMatrixMode(GL_PROJECTION));
     GL_CHECK(glLoadIdentity());
-        GL_CHECK(gluPerspective(fieldOfView, aspectRatio, nearClip, farClip));
+    GL_CHECK(gluPerspective(fieldOfView, aspectRatio, nearClip, farClip));
     //gluLookAt(0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
-
-    GL_CHECK(glMatrixMode(GL_MODELVIEW));
+    
     if (resetCam) {
         GL_CHECK(glLoadIdentity());
         //gluLookAt(center[0], center[1], center[2], center[0] + 1.0f, center[1], center[2], 0.0f, 1.0f, 0.0f);
         GL_CHECK(gluLookAt(0.0f, 2.0f, -12.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f));
         //glFrustum(center[0], center[0] - 0.5f, center[1], center[1] + 0.5f, center[2], center[2] - 0.5f);
         // Add a little rotation, using the elapsed time for smooth animation
-
         GL_CHECK(glRotatef(mx, 0, 1, 0));
         GL_CHECK(glRotatef(my, 0, 0, 1));
+        
+        GL_CHECK(glMatrixMode(GL_MODELVIEW));
     }
 
     //glTranslatef(0.0f, -3.0, 0.0);
