@@ -353,16 +353,19 @@ void handleInput() {
 
 //strType == diffuseMap (for instance.)
 void apply_texture(const aiTextureType type, const char* strType, const string strpath) {
+    pair<string, aiTextureType> identifier = make_pair(strpath, type);
+    if (textureIdMap.count(identifier) == 0) return;
+
     GLenum textureNum = to_texture_num(strpath, type);
     GLint loc;
-    
+
     cout << endl << " " << textureNum << " " << strType << endl;
     GL_CHECK(loc = glGetUniformLocation(shader->programID(), strType));
     GL_CHECK(glUniform1i(loc, textureNum - GL_TEXTURE0)); // The diffuse map will be
 
     GL_CHECK(glActiveTexture(textureNum));
 
-    sf::Image *img = textureIdMap[make_pair(strpath, type)];
+    sf::Image *img = textureIdMap[identifier];
 
     /* With thanks to http://stackoverflow.com/questions/5436487/how-would-i-be-able-to-use-glu-rgba-or-other-glu-parameters */
     //TODO: Far too slow. Preprocess.
@@ -379,7 +382,6 @@ void apply_texture(const aiTextureType type, const char* strType, const string s
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     */
-
     GL_CHECK(img->Bind());
 }
 
@@ -416,7 +418,7 @@ void recursive_render (const struct aiScene *sc, struct aiNode *nd, bool env_map
             apply_texture(aiTextureType_DIFFUSE, "diffuseMap", strpath);
 
             // Specular
-            //apply_texture(aiTextureType_SPECULAR, "specularMap", strpath);
+            apply_texture(aiTextureType_SPECULAR, "specularMap", strpath);
 
             /*
             GLint hasNormal;
@@ -508,11 +510,13 @@ void LoadGLTextures(const aiScene* scene) {
                 /* Diffuse texture */
                 filename = stringify(BASE_PATH) + stringify(path.data) + stringify("_d.jpg");
                 if (fexists(filename.c_str())) loadAndStoreImage(filename, basepath, aiTextureType_DIFFUSE);
+                else {cout << "FAILED TO FIND" << endl; }
 
                 /* Specular texture */
                 filename = stringify(BASE_PATH) + stringify(path.data) + stringify("_s.jpg");
 
                 if (fexists(filename.c_str())) loadAndStoreImage(filename, basepath, aiTextureType_SPECULAR);
+                else {cout << "FAILED TO FIND" << endl; }
 
                 filename = stringify(BASE_PATH) + stringify(path.data) + stringify("_n.jpg");
 
