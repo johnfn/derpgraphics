@@ -59,10 +59,13 @@ void LoadGLTextures(const aiScene* scene);
 #define GL_CHECK(x) {\
 (x);\
 GLenum error = glGetError();\
-if (GL_NO_ERROR != error) {\
+bool good = true;\
+while (GL_NO_ERROR != error) {\
+    good = false;\
     printf("Line %d: %s", __LINE__, gluErrorString(error));\
-    assert(false);\
+    error = glGetError();\
 }\
+assert(good);\
 }
 
 string stringify(const char* s) {
@@ -137,7 +140,7 @@ struct asset {
 
 vector<asset> assets;
 
-asset loadAsset(const char* name, int imp) {
+void loadAsset(const char* name, int imp) {
     asset a;
 
     a.scene = importers[imp].ReadFile(name,
@@ -152,7 +155,7 @@ asset loadAsset(const char* name, int imp) {
     }
     LoadGLTextures(a.scene);
 
-    return a;
+    assets.push_back(a);
 }
 
 GLuint envmap;
@@ -263,11 +266,10 @@ void loadAssets() {
     //asset cathedral = loadAsset(MODEL_PATH_CATH);
     //assets.push_back(cathedral);
 
-    asset a = loadAsset(MODEL_PATH_SPHE, 0);
-    assets.push_back(a);
+    //asset a = loadAsset(MODEL_PATH_SPHE, 0);
+    //assets.push_back(a);
 
-    asset c = loadAsset(MODEL_PATH_CATH, 1);
-    assets.push_back(c);
+    loadAsset(MODEL_PATH_CATH, 1);
 
     //asset sphere = loadAsset(MODEL_PATH_2);
     //assets.push_back(sphere);
@@ -283,7 +285,7 @@ void loadAssets() {
         cerr << "Shader failed to load." << endl;
         exit(-1);
     }
-    
+
     GL_CHECK(glUseProgram(shader->programID()));
 
     //createEnvironmentMap(&a, &c);
@@ -398,19 +400,13 @@ void recursive_render (const struct aiScene *sc, struct aiNode *nd, bool env_map
 
         //TODO: For now. I think I saw someone checking normals and then setting this accordingly.
 
-        // where doing this man
-        // where MAKING THIS HAPEN
-
         const struct aiMaterial *mtl = sc->mMaterials[mesh->mMaterialIndex];
         aiString texPath;
-
-        //texIndex ?!?
 
         // Get a "handle" to the texture variables inside our shader.  Then
         // pass two textures to the shader: one for diffuse, and the other for
         // transparency.
 
-        //apply_material(mtl);
         setMaterial(sc, mesh);
 
         if(AI_SUCCESS == mtl->GetTexture(aiTextureType_DIFFUSE, 0, &texPath)) {
@@ -422,7 +418,8 @@ void recursive_render (const struct aiScene *sc, struct aiNode *nd, bool env_map
 
             // Specular
             apply_texture(aiTextureType_SPECULAR, "specularMap", strpath);
-
+            
+            /*
             GLint hasNormal;
             GL_CHECK(hasNormal = glGetUniformLocation(shader->programID(), "hasNormalMapping"));
 
@@ -459,6 +456,7 @@ void recursive_render (const struct aiScene *sc, struct aiNode *nd, bool env_map
                 GL_CHECK(hasEnv = glGetUniformLocation(shader->programID(), "hasEnvMapping"));
                 GL_CHECK(glUniform1i(hasEnv, false));
             }
+             */
         }
         drawMesh(mesh);
     }
@@ -490,9 +488,10 @@ void loadAndStoreImage(string filename, string basepath, aiTextureType type, boo
     //img->Bind();
 
     /* With thanks to http://stackoverflow.com/questions/5436487/how-would-i-be-able-to-use-glu-rgba-or-other-glu-parameters */
-    if (filter) {
+    //TODO
+    /*if (filter) {
         GL_CHECK(gluBuild2DMipmaps(GL_TEXTURE_2D, GL_RGBA, img->GetWidth(), img->GetHeight(), GL_RGBA, GL_UNSIGNED_BYTE, img->GetPixelsPtr()));
-    }
+    }*/
 
 }
 
@@ -605,8 +604,8 @@ void drawMesh(const struct aiMesh *mesh) {
 
 void setupLight() {
     GL_CHECK(glEnable(GL_LIGHTING));
-    GLfloat light_ambient[] = { 0.1, 0.1, 0.1, 1.0 };
-    GLfloat light_diffuse[] = { 1.0, 1.0, 1.0, 1.0 };
+    GLfloat light_ambient[] =  { 0.1, 0.1, 0.1, 1.0 };
+    GLfloat light_diffuse[] =  { 1.0, 1.0, 1.0, 1.0 };
     GLfloat light_specular[] = { 1.0, 1.0, 1.0, 1.0 };
 
     GL_CHECK(glLightfv(GL_LIGHT0, GL_AMBIENT, light_ambient));
