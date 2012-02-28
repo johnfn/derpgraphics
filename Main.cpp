@@ -59,13 +59,10 @@ void LoadGLTextures(const aiScene* scene);
 #define GL_CHECK(x) {\
 (x);\
 GLenum error = glGetError();\
-bool good = true;\
-while (GL_NO_ERROR != error) {\
-    good = false;\
+if (GL_NO_ERROR != error) {\
     printf("Line %d: %s", __LINE__, gluErrorString(error));\
-    error = glGetError();\
+    assert(false);\
 }\
-assert(good);\
 }
 
 string stringify(const char* s) {
@@ -140,7 +137,7 @@ struct asset {
 
 vector<asset> assets;
 
-void loadAsset(const char* name, int imp) {
+asset loadAsset(const char* name, int imp) {
     asset a;
 
     a.scene = importers[imp].ReadFile(name,
@@ -155,7 +152,7 @@ void loadAsset(const char* name, int imp) {
     }
     LoadGLTextures(a.scene);
 
-    assets.push_back(a);
+    return a;
 }
 
 GLuint envmap;
@@ -269,7 +266,8 @@ void loadAssets() {
     //asset a = loadAsset(MODEL_PATH_SPHE, 0);
     //assets.push_back(a);
 
-    loadAsset(MODEL_PATH_CATH, 1);
+    asset c = loadAsset(MODEL_PATH_CATH, 1);
+    assets.push_back(c);
 
     //asset sphere = loadAsset(MODEL_PATH_2);
     //assets.push_back(sphere);
@@ -286,7 +284,6 @@ void loadAssets() {
         exit(-1);
     }
 
-    GL_CHECK(glUseProgram(shader->programID()));
 
     //createEnvironmentMap(&a, &c);
 
@@ -358,7 +355,7 @@ void handleInput() {
 void apply_texture(const aiTextureType type, const char* strType, const string strpath) {
     GLenum textureNum = to_texture_num(strpath, type);
     GLint loc;
-
+    
     cout << endl << " " << textureNum << " " << strType << endl;
     GL_CHECK(loc = glGetUniformLocation(shader->programID(), strType));
     GL_CHECK(glUniform1i(loc, textureNum - GL_TEXTURE0)); // The diffuse map will be
@@ -383,10 +380,12 @@ void apply_texture(const aiTextureType type, const char* strType, const string s
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     */
 
-    img->Bind();
+    GL_CHECK(img->Bind());
 }
 
 void recursive_render (const struct aiScene *sc, struct aiNode *nd, bool env_mapping) {
+    GL_CHECK(glUseProgram(shader->programID()));
+
     struct aiMatrix4x4 m = nd->mTransformation;
     m.Transpose();
     GL_CHECK(glPushMatrix());
@@ -417,8 +416,8 @@ void recursive_render (const struct aiScene *sc, struct aiNode *nd, bool env_map
             apply_texture(aiTextureType_DIFFUSE, "diffuseMap", strpath);
 
             // Specular
-            apply_texture(aiTextureType_SPECULAR, "specularMap", strpath);
-            
+            //apply_texture(aiTextureType_SPECULAR, "specularMap", strpath);
+
             /*
             GLint hasNormal;
             GL_CHECK(hasNormal = glGetUniformLocation(shader->programID(), "hasNormalMapping"));
@@ -488,10 +487,9 @@ void loadAndStoreImage(string filename, string basepath, aiTextureType type, boo
     //img->Bind();
 
     /* With thanks to http://stackoverflow.com/questions/5436487/how-would-i-be-able-to-use-glu-rgba-or-other-glu-parameters */
-    //TODO
-    /*if (filter) {
+    if (filter) {
         GL_CHECK(gluBuild2DMipmaps(GL_TEXTURE_2D, GL_RGBA, img->GetWidth(), img->GetHeight(), GL_RGBA, GL_UNSIGNED_BYTE, img->GetPixelsPtr()));
-    }*/
+    }
 
 }
 
@@ -509,13 +507,12 @@ void LoadGLTextures(const aiScene* scene) {
 
                 /* Diffuse texture */
                 filename = stringify(BASE_PATH) + stringify(path.data) + stringify("_d.jpg");
-
-                loadAndStoreImage(filename, basepath, aiTextureType_DIFFUSE);
+                if (fexists(filename.c_str())) loadAndStoreImage(filename, basepath, aiTextureType_DIFFUSE);
 
                 /* Specular texture */
                 filename = stringify(BASE_PATH) + stringify(path.data) + stringify("_s.jpg");
 
-                loadAndStoreImage(filename, basepath, aiTextureType_SPECULAR);
+                if (fexists(filename.c_str())) loadAndStoreImage(filename, basepath, aiTextureType_SPECULAR);
 
                 filename = stringify(BASE_PATH) + stringify(path.data) + stringify("_n.jpg");
 
@@ -588,6 +585,7 @@ void drawMesh(const struct aiMesh *mesh) {
     GL_CHECK(glVertexAttribPointer(normal, 3, GL_FLOAT, 0, sizeof(aiVector3D), mesh->mNormals));
 
     //Tangent
+    /*
     GL_CHECK(tangent = glGetAttribLocation(shader->programID(), "tangentIn"));
     GL_CHECK(glEnableVertexAttribArray(tangent));
     GL_CHECK(glVertexAttribPointer(tangent, 3, GL_FLOAT, 0, sizeof(aiVector3D), mesh->mTangents));
@@ -596,6 +594,7 @@ void drawMesh(const struct aiMesh *mesh) {
     GL_CHECK(biTangent = glGetAttribLocation(shader->programID(), "bitangentIn"));
     GL_CHECK(glEnableVertexAttribArray(biTangent));
     GL_CHECK(glVertexAttribPointer(biTangent, 3, GL_FLOAT, 0, sizeof(aiVector3D), mesh->mBitangents));
+     */
 
     if (mesh->mPrimitiveTypes == aiPrimitiveType_TRIANGLE) {
         GL_CHECK(glDrawElements(GL_TRIANGLES, 3 * mesh->mNumFaces, GL_UNSIGNED_INT, &indexBuffer[0]));
@@ -604,8 +603,8 @@ void drawMesh(const struct aiMesh *mesh) {
 
 void setupLight() {
     GL_CHECK(glEnable(GL_LIGHTING));
-    GLfloat light_ambient[] =  { 0.1, 0.1, 0.1, 1.0 };
-    GLfloat light_diffuse[] =  { 1.0, 1.0, 1.0, 1.0 };
+    GLfloat light_ambient[] = { 0.1, 0.1, 0.1, 1.0 };
+    GLfloat light_diffuse[] = { 1.0, 1.0, 1.0, 1.0 };
     GLfloat light_specular[] = { 1.0, 1.0, 1.0, 1.0 };
 
     GL_CHECK(glLightfv(GL_LIGHT0, GL_AMBIENT, light_ambient));
